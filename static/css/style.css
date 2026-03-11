@@ -1,0 +1,426 @@
+/* 基础样式与变量定义 */
+:root {
+  --primary: #3498db;
+  --primary-hover: #2980b9;
+  --secondary: #6c757d;
+  --success: #2ecc71;
+  --danger: #e74c3c;
+  --warning: #f39c12;
+  --info: #1abc9c;
+  --light: #f8f9fa;
+  --dark: #343a40;
+  --border-radius: 0.375rem;
+  --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+body {
+  background-color: var(--light);
+  min-height: 100vh;
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  color: #333;
+}
+
+/* 主内容区样式 */
+.main-content {
+  transition: var(--transition);
+  padding: 2rem 0;
+}
+
+.main-content .view {
+  display: none;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.main-content .view.active {
+  display: block;
+}
+
+/* 侧边栏增强样式 */
+.sidebar {
+  background-color: white;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  padding: 1.5rem 0;
+}
+
+.sidebar-brand {
+  padding: 0 1.5rem 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 1rem;
+}
+
+.sidebar .nav-link {
+  color: #555;
+  font-weight: 500;
+  transition: var(--transition);
+  border-radius: var(--border-radius);
+  margin: 0.25rem 1rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar .nav-link i {
+  margin-right: 0.75rem;
+  width: 1.25rem;
+  text-align: center;
+  font-size: 1.1em;
+}
+
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: white;
+  transform: translateX(5px);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar .nav-link.active {
+  font-weight: 600;
+}
+
+/* 卡片增强样式 */
+.card {
+  border: none;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-header {
+  font-weight: 600;
+  background-color: white;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.card-title {
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+/* 表格增强样式 */
+.table-responsive {
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.table {
+  margin-bottom: 0;
+  background-color: white;
+}
+
+.table thead th {
+  background-color: #f5f7fa;
+  border-bottom-width: 1px;
+  font-weight: 600;
+  color: #555;
+  padding: 1rem;
+}
+
+.table tbody td {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  border-top: 1px solid #f0f0f0;
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(52, 152, 219, 0.05);
+}
+
+/* AI分析面板增强样式 */
+#ai-analysis-panel {
+  transition: var(--transition);
+  border-radius: var(--border-radius);
+}
+
+.ai-analysis-result {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  min-height: 300px;
+  max-height: 500px;
+  overflow-y: auto;
+  box-shadow: var(--shadow-sm);
+  border-left: 4px solid var(--primary);
+}
+
+.ai-analysis-result pre {
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  overflow-x: auto;
+}
+
+/* 模态框样式增强 */
+.modal-content {
+  border: none;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 1.25rem 1.5rem;
+}
+
+.modal-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* 按钮增强样式 */
+.btn {
+  border-radius: var(--border-radius);
+  font-weight: 500;
+  padding: 0.5rem 1.25rem;
+  transition: var(--transition);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.btn-outline-secondary {
+  border-color: #e0e0e0;
+}
+
+.btn-outline-secondary:hover {
+  background-color: #f5f5f5;
+  border-color: #d0d0d0;
+}
+
+/* 图表容器增强样式 */
+.echarts-chart {
+  width: 100%;
+  height: 400px;
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-container {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.echarts-axis text {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-weight: 500;
+}
+
+.echarts-xaxis .echarts-axis-label {
+    width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+}
+.echarts-series-color-0 {
+    fill: #5470C6;
+}
+.echarts-series-color-1 {
+    fill: #91CC75;
+}
+.echarts-series-color-2 {
+    fill: #FAC858;
+}
+.echarts-series-color-3 {
+    fill: #EE6666;
+}
+.echarts-series-color-4 {
+    fill: #73C0DE;
+}
+.echarts-series-color-5 {
+    fill: #3BA272;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 992px) {
+  .sidebar {
+    height: auto;
+    position: relative;
+    margin-bottom: 2rem;
+  }
+  
+  #ai-analysis-panel {
+    margin-top: 2rem;
+  }
+}
+
+/* 表单元素增强样式 */
+.form-control, 
+.form-select {
+  border-radius: var(--border-radius);
+  border: 1px solid #e0e0e0;
+  padding: 0.5rem 1rem;
+  transition: var(--transition);
+}
+
+.form-control:focus, 
+.form-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.2);
+}
+
+.form-label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+/* 操作按钮增强样式 */
+.action-btn {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 50px;
+}
+
+/* 状态徽章增强样式 */
+.badge {
+  font-weight: 500;
+  padding: 0.4em 0.8em;
+  border-radius: 50px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+}
+
+.badge.bg-primary {
+  background-color: var(--primary) !important;
+}
+
+/* 上传区域增强样式 */
+.upload-area {
+  border: 2px dashed #e0e0e0;
+  border-radius: var(--border-radius);
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  background-color: white;
+}
+
+.upload-area:hover {
+  border-color: var(--primary);
+  background-color: rgba(52, 152, 219, 0.05);
+  transform: translateY(-2px);
+}
+
+.upload-area i {
+  font-size: 2.5rem;
+  color: var(--primary);
+  margin-bottom: 1rem;
+}
+
+/* 加载动画增强 */
+.loading-spinner {
+  display: inline-block;
+  width: 1.75rem;
+  height: 1.75rem;
+  vertical-align: middle;
+  border: 0.25em solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spinner-border 0.75s linear infinite;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 工具类 */
+.shadow-sm {
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.shadow-md {
+  box-shadow: var(--shadow-md) !important;
+}
+
+.shadow-lg {
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.rounded-lg {
+  border-radius: 0.5rem !important;
+}
+
+.transition {
+  transition: var(--transition) !important;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

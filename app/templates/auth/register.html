@@ -1,0 +1,81 @@
+{% extends 'auth/base.html' %}
+
+{% block content %}
+{% for field, errors in form.errors.items() %}
+  {% for error in errors %}
+    <div class="alert alert-danger">{{ error }}</div>
+  {% endfor %}
+{% endfor %}
+<link rel="stylesheet" href="/static/css/register.css">
+<body>
+    <div class="container">
+        <div class="register-container">
+            <div class="register-header">
+                <h2>注册新账号</h2>
+                <p class="text-muted">请填写以下信息</p>
+            </div>
+            
+            <form id="registerForm" method="POST" action="{{ url_for('register') }}" novalidate>
+                {{ form.hidden_tag() }}
+                
+                <div class="mb-3">
+                    <label for="name" class="form-label">用户名</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                        {{ form.name(class="form-control", id="name", placeholder="请输入用户名") }}
+                    </div>
+                    <div class="invalid-feedback" id="nameError"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="email" class="form-label">邮箱</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                        {{ form.email(class="form-control", id="email", placeholder="请输入邮箱地址") }}
+                    </div>
+                    <div class="invalid-feedback" id="emailError"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="phone" class="form-label">手机号</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-phone"></i></span>
+                        {{ form.phone(class="form-control", id="phone", placeholder="请输入11位手机号") }}
+                    </div>
+                    <div class="invalid-feedback" id="phoneError"></div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="password" class="form-label">密码</label>
+                    <div class="password-input-group">
+                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                        {{ form.password(class="form-control", id="password", placeholder="请输入密码") }}
+                        <button type="button" class="password-toggle">
+                            <i class="bi bi-eye-slash"></i>
+                        </button>
+                    </div>
+                    <div class="invalid-feedback" id="passwordError"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="password2" class="form-label">确认密码</label>
+                    <div class="password-input-group">
+                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                        {{ form.password2(class="form-control", id="password2", placeholder="请再次输入密码") }}
+                        <button type="button" class="password-toggle">
+                            <i class="bi bi-eye-slash"></i>
+                        </button>
+                    </div>
+                    <div class="invalid-feedback" id="confirmPasswordError"></div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-register w-100">注 册</button>
+                
+                <div class="register-footer">
+                    <span>已有账号? </span><a href="{{ url_for('login') }}">立即登录</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+{% endblock %}
