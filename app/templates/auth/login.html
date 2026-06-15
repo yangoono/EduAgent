@@ -12,15 +12,28 @@
             </div>
             
             <div class="tab-switcher">
-                <button id="phoneTab" class="active">手机号登录</button>
+                <button id="snoTab" class="active">学号登录</button>
+                <button id="phoneTab">手机号登录</button>
                 <button id="emailTab">邮箱登录</button>
             </div>
             
             <form id="loginForm" method="POST" action="{{ url_for('login') }}" novalidate>
                 {{ form.hidden_tag() }}
                 
+                <!-- 学号登录部分 -->
+                <div id="snoLogin" class="login-method">
+                    <div class="mb-3">
+                        <label for="sno" class="form-label">学号/工号</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                            {{ form.sno(class="form-control", id="sno", placeholder="请输入您的学号或工号") }}
+                        </div>
+                        <div class="invalid-feedback" id="snoError"></div>
+                    </div>
+                </div>
+
                 <!-- 手机号登录部分 -->
-                <div id="phoneLogin" class="login-method">
+                <div id="phoneLogin" class="login-method" style="display: none;">
                     <div class="mb-3">
                         <label for="phone" class="form-label">手机号</label>
                         <div class="input-group">

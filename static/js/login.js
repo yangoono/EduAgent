@@ -1,23 +1,45 @@
+// Helper function to switch tabs
+function setActiveTab(tabId, loginDivId, disableFields, enableFields) {
+    // Reset all tabs
+    document.getElementById('snoTab').classList.remove('active');
+    document.getElementById('phoneTab').classList.remove('active');
+    document.getElementById('emailTab').classList.remove('active');
+    
+    // Hide all login methods
+    document.getElementById('snoLogin').style.display = 'none';
+    document.getElementById('phoneLogin').style.display = 'none';
+    document.getElementById('emailLogin').style.display = 'none';
+    
+    // Activate clicked tab
+    document.getElementById(tabId).classList.add('active');
+    document.getElementById(loginDivId).style.display = 'block';
+    
+    // Set required / values
+    enableFields.forEach(f => {
+        const input = document.getElementById(f);
+        if (input) input.required = true;
+    });
+    disableFields.forEach(f => {
+        const input = document.getElementById(f);
+        if (input) {
+            input.required = false;
+            input.value = ''; // Clear out other fields
+        }
+    });
+    resetValidation();
+}
 
 // 切换登录方式
+document.getElementById('snoTab').addEventListener('click', function() {
+    setActiveTab('snoTab', 'snoLogin', ['phone', 'email'], ['sno']);
+});
+
 document.getElementById('phoneTab').addEventListener('click', function() {
-    this.classList.add('active');
-    document.getElementById('emailTab').classList.remove('active');
-    document.getElementById('phoneLogin').style.display = 'block';
-    document.getElementById('emailLogin').style.display = 'none';
-    document.getElementById('phone').required = true;
-    document.getElementById('email').required = false;
-    resetValidation();
+    setActiveTab('phoneTab', 'phoneLogin', ['sno', 'email'], ['phone']);
 });
 
 document.getElementById('emailTab').addEventListener('click', function() {
-    this.classList.add('active');
-    document.getElementById('phoneTab').classList.remove('active');
-    document.getElementById('emailLogin').style.display = 'block';
-    document.getElementById('phoneLogin').style.display = 'none';
-    document.getElementById('email').required = true;
-    document.getElementById('phone').required = false;
-    resetValidation();
+    setActiveTab('emailTab', 'emailLogin', ['sno', 'phone'], ['email']);
 });
 
 // 显示/隐藏密码
@@ -40,13 +62,19 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     let isValid = true;
     resetValidation();
     
-    // 检查手机号或邮箱是否填写
+    const snoTabActive = document.getElementById('snoTab').classList.contains('active');
     const phoneTabActive = document.getElementById('phoneTab').classList.contains('active');
+    const snoInput = document.getElementById('sno');
     const phoneInput = document.getElementById('phone');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     
-    if (phoneTabActive) {
+    if (snoTabActive) {
+        if (!snoInput.value) {
+            showError(snoInput, 'snoError', '请输入学号或工号');
+            isValid = false;
+        }
+    } else if (phoneTabActive) {
         if (!phoneInput.value) {
             showError(phoneInput, 'phoneError', '请输入手机号');
             isValid = false;
@@ -81,8 +109,10 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 function showError(input, errorElementId, message) {
     input.classList.add('is-invalid');
     const errorElement = document.getElementById(errorElementId);
-    errorElement.textContent = message;
-    errorElement.style.display = 'block';
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
 }
 
 function resetValidation() {
@@ -97,7 +127,12 @@ function resetValidation() {
 // 根据初始值自动选择标签页
 document.addEventListener('DOMContentLoaded', function() {
     const emailInput = document.getElementById('email');
+    const phoneInput = document.getElementById('phone');
     if (emailInput && emailInput.value) {
         document.getElementById('emailTab').click();
+    } else if (phoneInput && phoneInput.value) {
+        document.getElementById('phoneTab').click();
+    } else {
+        document.getElementById('snoTab').click();
     }
 });

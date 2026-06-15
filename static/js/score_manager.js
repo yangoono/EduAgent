@@ -102,15 +102,23 @@ function renderScoreTable(scores) {
     }
     scores.forEach(item => {
         const tr = document.createElement('tr');
+        let actionHtml = '';
+        if (window.currentUserRole !== 'student') {
+            actionHtml = `
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-primary me-2 edit-score-btn" data-sno="${item.sno}" data-cno="${item.cno}" data-score="${item.score}">编辑</button>
+                <button class="btn btn-sm btn-outline-danger delete-score-btn" data-sno="${item.sno}" data-cno="${item.cno}">删除</button>
+            </td>`;
+        } else {
+            actionHtml = `<td class="text-end"></td>`;
+        }
+        
         tr.innerHTML = `
             <td>${item.sno}</td>
             <td>${item.sname}</td>
             <td>${item.cname}</td>
             <td>${item.score}</td>
-            <td class="text-end">
-                <button class="btn btn-sm btn-outline-primary me-2 edit-score-btn" data-sno="${item.sno}" data-cno="${item.cno}" data-score="${item.score}">编辑</button>
-                <button class="btn btn-sm btn-outline-danger delete-score-btn" data-sno="${item.sno}" data-cno="${item.cno}">删除</button>
-            </td>
+            ${actionHtml}
         `;
         tbody.appendChild(tr);
     });

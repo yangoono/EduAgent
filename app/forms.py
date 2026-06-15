@@ -1,11 +1,12 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, Regexp, Optional
 
 class LoginForm(FlaskForm):
     """LoginForm类 用户登录表单"""
     phone = StringField('手机号', validators=[Optional()])
     email = StringField('邮箱', validators=[Optional()])
+    sno = StringField('学号/工号', validators=[Optional()])
     password = PasswordField('密码', validators=[
         DataRequired(message='请输入密码'),
         Length(min=6, max=20, message='密码长度6-20位')
@@ -29,6 +30,15 @@ class RegisterForm(FlaskForm):
     ])
     name = StringField('真实姓名', validators=[
         DataRequired(message='请输入姓名')])
+    sno = StringField('学号/工号', validators=[
+        Optional(),
+        Length(max=20, message='学号/工号过长')
+    ])
+    role = SelectField('注册身份', choices=[
+        ('student', '学生'),
+        ('teacher', '教师'),
+        ('admin', '管理员')
+    ], default='student')
     password = PasswordField('密码', validators=[
         DataRequired(message='请输入密码'),
         Length(min=6, max=20, message='密码长度6-20位')

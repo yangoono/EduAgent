@@ -17,7 +17,7 @@
 
 <body class="d-flex flex-column min-vh-100">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-lg fixed-top">
-        <div class="container">
+        <div class="container-fluid px-xl-5 px-lg-4">
             <a class="navbar-brand d-flex align-items-center" href="/">
                 <i class="fas fa-graduation-cap fa-2x me-2 text-white"></i>
                 <span class="fw-bold text-white fs-4">校园综合管理系统</span>
@@ -43,7 +43,7 @@
     </nav>
 
     <main class="flex-grow-1 py-4 mt-5">
-        <div class="container my-4 pt-4">
+        <div class="container-fluid px-xl-5 px-lg-4 my-4 pt-4">
             <div class="flash-messages-container">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
@@ -74,7 +74,7 @@
     </main>
 
     <footer class="bg-light py-3 mt-auto">
-        <div class="container text-center text-muted">
+        <div class="container-fluid px-xl-5 px-lg-4 text-center text-muted">
             <p class="mb-0">&copy; {{ moment().format('YYYY') }} 校园综合管理系统. 保留所有权利。</p> {# 优化：动态获取年份 #}
             {{ moment.include_moment() }}
             <p class="mb-0">由 <a>yjy</a> 设计和开发</p> 

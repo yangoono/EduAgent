@@ -1,3 +1,6 @@
+import os
+os.environ['NO_PROXY'] = 'localhost,127.0.0.1,11434'
+
 from flask import Flask
 from app.config import Config
 from flask_sqlalchemy import SQLAlchemy

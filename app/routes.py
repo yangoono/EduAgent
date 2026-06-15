@@ -1,6 +1,8 @@
 from operator import or_
-from flask import render_template, flash, redirect, url_for, request, jsonify, send_file
+from flask import render_template, flash, redirect, url_for, request, jsonify, send_file, current_app, g
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+import jwt
+from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 import numpy as np
 import requests
@@ -9,13 +11,15 @@ import io
 import csv
 import pandas as pd
 from app import app, db
-from app.models import User, Student, Score, Course
+from app.models import User, Student, Score, Course, KnowledgeDoc, Teacher, Role, Permission
 from app.forms import LoginForm, RegisterForm
-
-# client = OpenAI(
-#       api_key=os.environ.get("AI_STUDIO_API_KEY"),  # 含有 AI Studio 访问令牌的环境变量，https://aistudio.baidu.com/account/accessToken  ,
-#       base_url="https://qianfan.baidubce.com/v2/chat/completions  ",  # aistudio 大模型 api 服务域名
-# )
+from app.decorators import require_role, jwt_required
+from app.ai.risk_predictor import calculate_risk
+from app.rag.pipeline import query_rag, add_document, process_pdf
+from app.agents.teacher_agent import get_teacher_response
+from app.agents.student_agent import get_student_response
+from app.agents.admin_agent import get_admin_response
+from app.edge.minicpm_v import extract_structured_data_from_image
 
 # 初始化登录管理器
 login_manager = LoginManager()
@@ -28,7 +32,6 @@ login_manager.login_message_category = 'warning'
 def load_user(id):
     '''
     用户加载回调函数。
-    Flask-Login使用此函数根据用户ID从数据库中加载用户对象。
     '''
     return User.query.get(id)
 
@@ -47,13 +50,37 @@ def login():
             user = User.query.filter_by(email=form.email.data).first()
         elif form.phone.data:
             user = User.query.filter_by(phone=form.phone.data).first()
+        elif form.sno.data:
+            user = User.query.filter_by(sno=form.sno.data).first()
+        
         if user is None or not user.check_password(form.password.data):
             flash('用户名或密码无效', 'danger')
             return redirect(url_for('login'))
         
+        # 签发 JWT
+        token = jwt.encode({
+            'user_id': user.id,
+            'role': user.role,
+            'sno': user.sno,
+            'exp': datetime.utcnow() + timedelta(days=7)
+        }, current_app.config['JWT_SECRET_KEY'], algorithm='HS256')
+        
+        # 同时保留 Session 登录兼容旧页面
         login_user(user, remember=form.remember_me.data)
+        
+        # 如果是AJAX请求，返回JSON，否则渲染模板
+        if request.headers.get('Accept') == 'application/json':
+            return jsonify({'success': True, 'token': token, 'role': user.role})
+            
+        # 这里为了演示JWT存储，我们将Token通过JS种到LocalStorage
+        # 实际开发中可以通过专门的/api/login分离
         flash('登录成功!', 'success')
-        return redirect(url_for('dashboard'))
+        response = redirect(url_for('dashboard'))
+        response.set_cookie('temp_token', token) # 用于页面跳转后提取存储
+        return response
+    else:
+        if request.method == 'POST':
+            print(f"Login form validation failed: {form.errors}")
     return render_template('auth/login.html', form=form)
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -75,7 +102,7 @@ def register():
         if email_exists:
             flash('邮箱已被注册。请使用其他邮箱或登录。', 'danger')
             return render_template('auth/register.html', form=form)
-        user = User(email=form.email.data, phone=form.phone.data, name=form.name.data) # type: ignore
+        user = User(email=form.email.data, phone=form.phone.data, name=form.name.data, sno=form.sno.data, role=form.role.data) # type: ignore
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
@@ -107,7 +134,8 @@ def dashboard():
 # 学生管理API
 # -----------------
 @app.route('/api/students', methods=['GET'])
-@login_required
+@jwt_required
+@require_role('admin', 'teacher')
 def get_students():
     """
     获取所有学生列表。
@@ -121,7 +149,8 @@ def get_students():
     return jsonify([s.to_dict() for s in students])
 
 @app.route('/api/students', methods=['POST'])
-@login_required
+@jwt_required
+@require_role('admin', 'teacher')
 def add_student():
     """
     添加一个新学生。
@@ -151,7 +180,8 @@ def add_student():
         }), 400
 
 @app.route('/api/students/<sno>', methods=['PUT'])
-@login_required
+@jwt_required
+@require_role('admin', 'teacher')
 def update_student(sno):
     """
     根据学号更新一个已存在的学生信息。
@@ -179,7 +209,8 @@ def update_student(sno):
     })
 
 @app.route('/api/students/<sno>', methods=['DELETE'])
-@login_required
+@jwt_required
+@require_role('admin')
 def delete_student(sno):
     """
     根据学号删除一个学生。
@@ -211,7 +242,7 @@ def delete_student(sno):
 # 课程管理API
 # -----------------
 @app.route('/api/courses', methods=['GET'])
-@login_required
+@jwt_required
 def get_all_courses():
     """
     获取所有课程列表，支持通过查询参数进行筛选。
@@ -251,7 +282,7 @@ def get_all_courses():
     return jsonify([c.to_dict() for c in courses])
 
 @app.route('/api/courses/<cno>', methods=['GET'])
-@login_required
+@jwt_required
 def get_course(cno):
     """
     根据课程号查询单个课程信息。
@@ -264,7 +295,8 @@ def get_course(cno):
     return jsonify(course.to_dict())
 
 @app.route('/api/courses', methods=['POST'])
-@login_required
+@jwt_required
+@require_role('admin', 'teacher')
 def add_course():
     """
     添加一个新课程。
@@ -297,7 +329,8 @@ def add_course():
         }), 400
 
 @app.route('/api/courses/<cno>', methods=['PUT'])
-@login_required
+@jwt_required
+@require_role('admin', 'teacher')
 def update_course(cno):
     """
     根据课程号更新一个已存在的课程信息。
@@ -324,7 +357,8 @@ def update_course(cno):
     })
 
 @app.route('/api/courses/<cno>', methods=['DELETE'])
-@login_required
+@jwt_required
+@require_role('admin')
 def delete_course(cno):
     """
     根据课程号删除一个课程。
@@ -355,7 +389,7 @@ def delete_course(cno):
 
 
 @app.route('/api/scores', methods=['GET'])
-@login_required
+@jwt_required
 def get_scores():
     """
     查询所有学生成绩，并将成绩与学生姓名和课程名称关联后返回。
@@ -369,6 +403,11 @@ def get_scores():
     student_query = request.args.get('student', None)  
     course_query = request.args.get('course', None)   
     score_query = request.args.get('score', None)   
+
+    # 如果是学生角色，强制覆盖学生查询条件为其自己的学号
+    if g.current_user_role == 'student':
+        student_query = g.current_sno
+
 
     # 构造基础查询，联合查询 Score、Student 和 Course 表
     query = db.session.query(
@@ -416,7 +455,8 @@ def get_scores():
     return jsonify(result)
 
 @app.route('/api/scores', methods=['POST'])
-@login_required
+@jwt_required
+@require_role('admin', 'teacher')
 def add_score():
     """
     接收客户端发送的成绩数据，如果成绩已存在则更新，否则添加新成绩。
@@ -472,7 +512,8 @@ def add_score():
         }), 500
 
 @app.route('/api/scores/<sno>/<cno>', methods=['PUT'])
-@login_required
+@jwt_required
+@require_role('admin', 'teacher')
 def update_score(sno, cno):
     """
     修改某个学生某门课的成绩
@@ -495,7 +536,8 @@ def update_score(sno, cno):
         return jsonify({'success': False, 'message': f'操作失败: {str(e)}'}), 500
 
 @app.route('/api/scores/<sno>/<cno>', methods=['DELETE'])
-@login_required
+@jwt_required
+@require_role('admin', 'teacher')
 def delete_score(sno, cno):
     """
     删除某个学生某门课的成绩
@@ -516,7 +558,7 @@ def delete_score(sno, cno):
 # 数据分析API
 #--------------------
 @app.route('/api/analysis/avg_score_by_dept', methods=['GET'])
-@login_required
+@jwt_required
 def avg_score_by_dept():
     """
     计算并返回各专业的平均成绩。
@@ -541,7 +583,7 @@ def avg_score_by_dept():
     })
 
 @app.route('/api/analysis/student_origin', methods=['GET'])
-@login_required
+@jwt_required
 def student_origin():
     """
     统计并返回学生生源地分布数据。
@@ -564,40 +606,105 @@ def student_origin():
     })
 
 @app.route('/api/analysis/student_radar/<sno>', methods=['GET'])
-@login_required
+@jwt_required
 def student_radar(sno):
+    # 保留原接口兼容性，但不再推荐使用，新前端将使用 student_dashboard 接口
+    scores = db.session.query(Course.cname, Score.score).join(Score, Course.cno == Score.cno).filter(Score.sno == sno).all()
+    if not scores: return jsonify({'courses': [], 'scores': []})
+    return jsonify({'courses': [s.cname for s in scores], 'scores': [s.score for s in scores]})
+
+@app.route('/api/analysis/student_dashboard/<sno>', methods=['GET'])
+@jwt_required
+def student_dashboard(sno):
     """
-    返回指定学生的各科成绩数据，用于雷达图。
-    路径参数:
-        sno: 学生学号
-    响应格式:
-    {
-        "courses": ["课程1", "课程2", ...],
-        "scores": [成绩1, 成绩2, ...]
+    学生综合仪表盘接口：返回雷达图数据、专业排名、及学业预警状态。
+    基于《桂电教〔2025〕28号》规则：
+    黄：挂科>=3门或学分>=10；橙：挂科>=4门或学分>=15；红：挂科>=5门或学分>=20；退学：累计挂科学分>=25
+    """
+    student = Student.query.get(sno)
+    if not student:
+        return jsonify({'error': 'Student not found'}), 404
+
+    # 1. 雷达图成绩数据
+    course_scores = db.session.query(Course.cname, Course.ccredit, Score.score).join(
+        Score, Course.cno == Score.cno).filter(Score.sno == sno).all()
+    
+    radar_courses = [cs.cname for cs in course_scores]
+    radar_scores = [cs.score for cs in course_scores]
+    radar_credits = [cs.ccredit for cs in course_scores]
+    
+    # 2. 学业预警判定 (Academic Warning)
+    failed_count = 0
+    failed_credits = 0
+    for cs in course_scores:
+        if cs.score < 60:
+            failed_count += 1
+            failed_credits += cs.ccredit
+            
+    warning_status = 'safe'
+    warning_level = 0
+    
+    if failed_credits >= 25:
+        warning_status = 'expulsion'
+        warning_level = 4
+    elif failed_count >= 5 or failed_credits >= 20:
+        warning_status = 'red'
+        warning_level = 3
+    elif failed_count >= 4 or failed_credits >= 15:
+        warning_status = 'orange'
+        warning_level = 2
+    elif failed_count >= 3 or failed_credits >= 10:
+        warning_status = 'yellow'
+        warning_level = 1
+        
+    warning_info = {
+        'status': warning_status,
+        'level': warning_level,
+        'failed_count': failed_count,
+        'failed_credits': failed_credits
     }
-    """
-    scores = db.session.query(
-        Course.cname,
-        Score.score
-    ).join(
-        Score, Course.cno == Score.cno
-    ).filter(
-        Score.sno == sno
-    ).all()
+
+    # 3. 排名与超越百分比
+    # 计算全专业的学生平均分
+    dept_students = Student.query.filter_by(sdept=student.sdept).all()
+    dept_snos = [s.sno for s in dept_students]
     
-    if not scores:
-        return jsonify({
-            'courses': [],
-            'scores': []
-        })
+    # 获取专业所有学生的成绩聚合
+    all_scores = db.session.query(Score.sno, db.func.avg(Score.score).label('avg')).filter(
+        Score.sno.in_(dept_snos)).group_by(Score.sno).all()
+        
+    # 排序计算排名
+    all_scores.sort(key=lambda x: x.avg or 0, reverse=True)
+    total_students = len(all_scores)
     
+    my_rank = total_students
+    my_avg = 0
+    for i, s_record in enumerate(all_scores):
+        if s_record.sno == sno:
+            my_rank = i + 1
+            my_avg = float(s_record.avg or 0)
+            break
+            
+    beat_percentage = 0
+    if total_students > 1:
+        beat_percentage = round(((total_students - my_rank) / total_students) * 100, 1)
+
+    rank_info = {
+        'rank': my_rank,
+        'total': total_students,
+        'beat_percentage': beat_percentage,
+        'avg_score': round(my_avg, 2),
+        'dept': student.sdept
+    }
+
     return jsonify({
-        'courses': [s.cname for s in scores],
-        'scores': [s.score for s in scores]
+        'radar': {'courses': radar_courses, 'scores': radar_scores, 'credits': radar_credits},
+        'warning': warning_info,
+        'rank': rank_info
     })
 
 @app.route('/api/analysis/course_distribution/<cno>', methods=['GET'])
-@login_required
+@jwt_required
 def course_distribution(cno):
     """
     返回指定课程的成绩分布数据，用于饼图和箱线图。
@@ -636,10 +743,77 @@ def course_distribution(cno):
     return jsonify({
         'course_name': course.cname,
         'pie_data': pie_data,
-        'boxplot_data': {
-            'boxData': scores
-        }
+        'boxplot_data': {'boxData': scores}
     })
+
+@app.route('/api/analysis/course_correlation', methods=['GET'])
+@jwt_required
+def course_correlation():
+    """
+    使用 Apriori 思想进行课程及格率关联分析。
+    """
+    from collections import defaultdict
+    
+    # 提取所有及格(>=60)的成绩记录
+    passing_scores = db.session.query(Score.sno, Score.cno).filter(Score.score >= 60).all()
+    
+    # 获取课程字典映射
+    courses = {c.cno: c.cname for c in Course.query.all()}
+    
+    # 按学生分组
+    student_courses = defaultdict(set)
+    for sno, cno in passing_scores:
+        student_courses[sno].add(cno)
+        
+    total_students = len(student_courses)
+    if total_students == 0:
+        return jsonify({'nodes': [], 'links': []})
+        
+    # 计算 support
+    course_support = defaultdict(int)
+    pair_support = defaultdict(int)
+    
+    for sno, cnos in student_courses.items():
+        cno_list = list(cnos)
+        for c in cno_list:
+            course_support[c] += 1
+            
+        for i in range(len(cno_list)):
+            for j in range(i + 1, len(cno_list)):
+                c1, c2 = cno_list[i], cno_list[j]
+                if c1 > c2:
+                    c1, c2 = c2, c1
+                pair_support[(c1, c2)] += 1
+                
+    nodes = []
+    links = []
+    
+    # 添加节点
+    for cno, count in course_support.items():
+        nodes.append({
+            'id': cno,
+            'name': courses.get(cno, cno),
+            'value': count, # 频次越高，节点越大
+            'symbolSize': min(count * 2, 60) # 视觉缩放
+        })
+        
+    # 添加边 (置信度过滤)
+    for (c1, c2), count in pair_support.items():
+        support = count / total_students
+        # 简单过滤关联不够强的
+        if count >= 3: 
+            links.append({
+                'source': c1,
+                'target': c2,
+                'value': count,
+                'label': {'show': False}
+            })
+            
+    return jsonify({
+        'nodes': nodes,
+        'links': links
+    })
+
 
 #--------------------
 # AI分析及CSV导入导出API
@@ -788,6 +962,192 @@ def ai_analyze_course(cno):
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
+@app.route('/api/ai/risk/<sno>', methods=['GET'])
+@jwt_required
+def get_student_risk(sno):
+    """
+    获取学生的学业风险预测
+    """
+    student = Student.query.get_or_404(sno)
+    scores = db.session.query(
+        Course.cname,
+        Course.ccredit,
+        Score.score
+    ).join(
+        Score, Course.cno == Score.cno
+    ).filter(
+        Score.sno == sno
+    ).all()
+    
+    scores_data = [{'cname': s.cname, 'score': s.score, 'ccredit': s.ccredit} for s in scores]
+    risk_level, explanation = calculate_risk(scores_data)
+    
+    return jsonify({
+        'success': True,
+        'sno': sno,
+        'risk_level': risk_level,
+        'reason': explanation
+    })
+
+# -----------------
+# RAG 校园知识库 API
+# -----------------
+@app.route('/api/rag/query', methods=['POST'])
+@jwt_required
+def api_rag_query():
+    data = request.get_json()
+    question = data.get('question')
+    if not question:
+        return jsonify({'success': False, 'message': '请输入问题'}), 400
+        
+    answer, sources = query_rag(question)
+    return jsonify({
+        'success': True,
+        'answer': answer,
+        'sources': sources
+    })
+
+@app.route('/api/rag/docs', methods=['GET'])
+@jwt_required
+@require_role('admin')
+def api_rag_docs():
+    docs = KnowledgeDoc.query.all()
+    # 避免返回庞大的 embedding 数据
+    return jsonify([
+        {
+            'id': d.id,
+            'title': d.title,
+            'content': d.content
+        } for d in docs
+    ])
+
+@app.route('/api/rag/upload', methods=['POST'])
+@jwt_required
+@require_role('admin')
+def api_rag_upload():
+    data = request.get_json()
+    title = data.get('title')
+    content = data.get('content')
+    if not title or not content:
+        return jsonify({'success': False, 'message': '缺少标题或内容'}), 400
+        
+    try:
+        docs = add_document(title, content)
+        return jsonify({'success': True, 'docs': [d.to_dict() for d in docs]})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/rag/upload_pdf', methods=['POST'])
+@jwt_required
+@require_role('admin')
+def api_rag_upload_pdf():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '未找到文件部分'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'}), 400
+    
+    if file and file.filename.lower().endswith('.pdf'):
+        import tempfile
+        import os
+        try:
+            # 存为临时文件供 process_pdf 处理
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.pdf')
+            os.close(temp_fd)
+            file.save(temp_path)
+            
+            title_prefix = file.filename.replace('.pdf', '')
+            docs_added = process_pdf(temp_path, title_prefix=title_prefix)
+            
+            os.remove(temp_path)
+            
+            if not docs_added:
+                return jsonify({'success': False, 'message': 'PDF解析失败或内容为空'}), 400
+                
+            return jsonify({'success': True, 'message': f'成功解析 PDF 并添加 {len(docs_added)} 个分块到知识库'})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+    else:
+        return jsonify({'success': False, 'message': '仅支持 PDF 文件'}), 400
+
+# -----------------
+# 多 Agent 系统 API
+# -----------------
+@app.route('/api/agent/teacher', methods=['POST'])
+@jwt_required
+def api_agent_teacher():
+    data = request.get_json()
+    message = data.get('message')
+    history = data.get('history', [])
+    if not message:
+        return jsonify({'success': False, 'message': '消息为空'}), 400
+    
+    reply, thinking_steps, echarts_option = get_teacher_response(message, history)
+    return jsonify({'success': True, 'reply': reply, 'thinking_steps': thinking_steps, 'echarts_option': echarts_option})
+
+@app.route('/api/agent/student', methods=['POST'])
+@jwt_required
+def api_agent_student():
+    data = request.get_json()
+    message = data.get('message')
+    history = data.get('history', [])
+    if not message:
+        return jsonify({'success': False, 'message': '消息为空'}), 400
+    
+    current_sno = getattr(current_user, 'sno', None)
+    
+    reply, history, thinking_steps, echarts_option = get_student_response(message, history, current_sno=current_sno)
+    return jsonify({'success': True, 'reply': reply, 'thinking_steps': thinking_steps, 'echarts_option': echarts_option})
+
+@app.route('/api/agent/admin', methods=['POST'])
+@jwt_required
+@require_role('admin')
+def api_agent_admin():
+    data = request.get_json()
+    message = data.get('message')
+    history = data.get('history', [])
+    if not message:
+        return jsonify({'success': False, 'message': '消息为空'}), 400
+    
+    reply, thinking_steps, echarts_option = get_admin_response(message, history)
+    return jsonify({'success': True, 'reply': reply, 'thinking_steps': thinking_steps, 'echarts_option': echarts_option})
+
+# -----------------
+# 端侧隐私计算 (Edge AI) 接口
+# -----------------
+@app.route('/api/edge/ocr', methods=['POST'])
+def api_edge_ocr():
+    """
+    接收前端传来的图片，调用端侧模型提取结构化数据。
+    这里不保存原始图片，只返回 JSON，贯彻隐私保护思想。
+    """
+    image_bytes = None
+    data_type = 'score'
+    
+    if request.is_json:
+        req_data = request.get_json()
+        if 'image_base64' in req_data:
+            import base64
+            try:
+                image_bytes = base64.b64decode(req_data['image_base64'])
+            except Exception as e:
+                return jsonify({'success': False, 'message': f'Base64解码失败: {e}'}), 400
+        data_type = req_data.get('data_type', 'score')
+    
+    if not image_bytes:
+        if 'image' in request.files:
+            file = request.files['image']
+            if file.filename != '':
+                image_bytes = file.read()
+        data_type = request.form.get('data_type', 'score')
+
+    if not image_bytes:
+        return jsonify({'success': False, 'message': '未找到图片数据，请提供 multipart/form-data ("image") 或 JSON ("image_base64")'}), 400
+        
+    extracted_data = extract_structured_data_from_image(image_bytes, data_type)
+    
+    return jsonify({'success': True, 'data': extracted_data})
+
 def get_filtered_students_from_db(sno_sname=None, sdept=None, sgrade=None, sclass=None):
     """
     根据多种筛选条件从数据库获取学生数据的内部辅助函数。
@@ -814,7 +1174,7 @@ def get_filtered_students_from_db(sno_sname=None, sdept=None, sgrade=None, sclas
     return query.all()
 
 @app.route('/api/students/export-csv')
-@login_required
+@jwt_required
 def export_student_csv():
     """
     根据查询参数筛选学生数据，并将其导出为CSV文件。
@@ -977,7 +1337,7 @@ def import_scores_from_csv(file):
 
 
 @app.route('/api/import-csv', methods=['POST'])
-@login_required
+@jwt_required
 def import_csv():
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '未找到文件部分。'}), 400
@@ -991,14 +1351,92 @@ def import_csv():
     if not file.filename.lower().endswith('.csv'):
         return jsonify({'success': False, 'message': '仅支持CSV格式文件。'}), 400
 
-    import_functions = {
-        'students': import_students_from_csv,
-        'courses': import_courses_from_csv,
-        'scores': import_scores_from_csv,
-    }
+# ------------------
+# 教师管理API
+# -----------------
+@app.route('/api/teachers', methods=['GET'])
+@jwt_required
+def get_teachers():
+    teachers = Teacher.query.all()
+    return jsonify([t.to_dict() for t in teachers])
 
-    if upload_type not in import_functions:
-        return jsonify({'success': False, 'message': '不支持的上传类型。'}), 400
+@app.route('/api/teachers', methods=['POST'])
+@jwt_required
+@require_role('admin')
+def add_teacher():
+    data = request.get_json()
+    if not data or not all(key in data for key in ['tno', 'tname', 'tdept', 'title']):
+        return jsonify({'success': False, 'message': '缺少必要字段'}), 400
+    try:
+        new_teacher = Teacher(**data)
+        db.session.add(new_teacher)
+        db.session.commit()
+        return jsonify({'success': True, 'teacher': new_teacher.to_dict()}), 201
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': '工号已存在'}), 400
 
-    result, status_code = import_functions[upload_type](file)
-    return jsonify(result), status_code
+@app.route('/api/teachers/<tno>', methods=['PUT'])
+@jwt_required
+@require_role('admin')
+def update_teacher(tno):
+    data = request.get_json()
+    teacher = Teacher.query.get_or_404(tno)
+    teacher.tname = data.get('tname', teacher.tname)
+    teacher.tsex = data.get('tsex', teacher.tsex)
+    teacher.tdept = data.get('tdept', teacher.tdept)
+    teacher.title = data.get('title', teacher.title)
+    db.session.commit()
+    return jsonify({'success': True, 'teacher': teacher.to_dict()})
+
+@app.route('/api/teachers/<tno>', methods=['DELETE'])
+@jwt_required
+@require_role('admin')
+def delete_teacher(tno):
+    teacher = Teacher.query.get_or_404(tno)
+    db.session.delete(teacher)
+    db.session.commit()
+    return jsonify({'success': True, 'message': '教师已删除'})
+
+# ------------------
+# RBAC: 角色与权限管理API
+# -----------------
+@app.route('/api/roles', methods=['GET'])
+@jwt_required
+def get_roles():
+    roles = Role.query.all()
+    return jsonify([r.to_dict() for r in roles])
+
+@app.route('/api/roles', methods=['POST'])
+@jwt_required
+@require_role('admin')
+def add_role():
+    data = request.get_json()
+    if not data or 'name' not in data:
+        return jsonify({'success': False, 'message': '缺少必要字段'}), 400
+    try:
+        new_role = Role(name=data['name'], description=data.get('description', ''))
+        db.session.add(new_role)
+        db.session.commit()
+        return jsonify({'success': True, 'role': new_role.to_dict()}), 201
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': '角色已存在'}), 400
+
+@app.route('/api/permissions', methods=['GET'])
+@jwt_required
+def get_permissions():
+    permissions = Permission.query.all()
+    return jsonify([p.to_dict() for p in permissions])
+
+@app.route('/api/users/<int:user_id>/roles', methods=['POST'])
+@jwt_required
+@require_role('admin')
+def assign_role(user_id):
+    data = request.get_json()
+    user = User.query.get_or_404(user_id)
+    if 'role' in data:
+        user.role = data['role']
+        db.session.commit()
+        return jsonify({'success': True, 'message': '角色分配成功'})
+    return jsonify({'success': False, 'message': '缺少 role 字段'}), 400

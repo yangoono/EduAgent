@@ -1,4 +1,5 @@
 from app import db
+# pyrefly: ignore [missing-import]
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -70,6 +71,45 @@ class Score(db.Model):
             'score': self.score
         }
 
+class Teacher(db.Model):
+    __tablename__ = 'teachers'
+    tno = db.Column(db.String(20), primary_key=True)
+    tname = db.Column(db.String(50), nullable=False)
+    tdept = db.Column(db.String(50), nullable=False)
+    
+    def to_dict(self):
+        return {
+            'tno': self.tno,
+            'tname': self.tname,
+            'tdept': self.tdept
+        }
+
+# Association table for User <-> Role
+user_roles = db.Table('user_roles',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('role_id', db.Integer, db.ForeignKey('roles.id'), primary_key=True)
+)
+
+# Association table for Role <-> Permission
+role_permissions = db.Table('role_permissions',
+    db.Column('role_id', db.Integer, db.ForeignKey('roles.id'), primary_key=True),
+    db.Column('permission_id', db.Integer, db.ForeignKey('permissions.id'), primary_key=True)
+)
+
+class Role(db.Model):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    
+    permissions = db.relationship('Permission', secondary=role_permissions, lazy='subquery',
+        backref=db.backref('roles', lazy=True))
+
+class Permission(db.Model):
+    __tablename__ = 'permissions'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    resource_path = db.Column(db.String(200), nullable=True)
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True) 
@@ -77,6 +117,12 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(15), unique=True, nullable=True)
     email = db.Column(db.String(100), unique=True, nullable=True)
+    role = db.Column(db.String(20), nullable=False, default='student') # admin, teacher, student (kept for backward compatibility)
+    sno = db.Column(db.String(20), nullable=True) # 关联的学号或工号
+    
+    # New RBAC relationship
+    roles = db.relationship('Role', secondary=user_roles, lazy='subquery',
+        backref=db.backref('users', lazy=True))
     
     __table_args__ = (
         db.CheckConstraint("email IS NOT NULL OR phone IS NOT NULL", name='email_or_phone_required'),
@@ -90,3 +136,17 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f'<User {self.name}>'
+
+class KnowledgeDoc(db.Model):
+    __tablename__ = 'knowledge_docs'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    embedding = db.Column(db.JSON, nullable=True) # 存储为JSON数组
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'content': self.content
+        }

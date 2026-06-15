@@ -424,3 +424,13 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+/* AI Assistant Chat Styles */
+.chat-messages { display: flex; flex-direction: column; gap: 1rem; }
+.message-bubble { border-radius: 1.2rem; display: inline-block; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; transition: all 0.2s ease-in-out; }
+.message-bubble:hover { transform: translateY(-1px); }
+.user-message .message-bubble { background-color: var(--bs-primary) !important; color: white !important; border-top-right-radius: 0.2rem; }
+.ai-message .message-bubble { background-color: #ffffff !important; border-top-left-radius: 0.2rem; }
+.typing-indicator span { display: inline-block; width: 6px; height: 6px; background-color: #9ca3af; border-radius: 50%; animation: typing 1.4s infinite ease-in-out both; margin: 0 2px; }
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+@keyframes typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
