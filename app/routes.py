@@ -921,7 +921,7 @@ def get_llm_analysis(data_type, identifier):
         })
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer bce-v3/ALTAK-Ql9AdJAHL15RJXd0eFGRT/4b961c1c585a90c7227a7a0848a1b4dc263f1035'
+            'Authorization': ''
         }
         
         response = requests.request("POST", url, headers=headers, data=payload)
