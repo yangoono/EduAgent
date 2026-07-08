@@ -1,122 +1,29 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const chatInput = document.getElementById('chat-input');
-    const sendBtn = document.getElementById('send-msg-btn');
-    const messagesArea = document.getElementById('chat-messages-area');
-    const clearBtn = document.getElementById('clear-chat-btn');
-    const imageInput = document.getElementById('chat-image-input');
-    const uploadTrigger = document.getElementById('upload-image-trigger');
-    const currentAgentBadge = document.getElementById('current-agent-badge');
+/**
+ * EduAgent — AI Assistant Panel
+ * Supports SSE streaming via /api/agent/stream.
+ */
+document.addEventListener('DOMContentLoaded', function () {
 
-    // 默认是学生角色
-    let currentRole = 'student';
-    let currentAgentName = '学生助手模型';
+    const chatInput      = document.getElementById('chat-input');
+    const sendBtn        = document.getElementById('send-msg-btn');
+    const messagesArea   = document.getElementById('chat-messages-area');
+    const clearBtn       = document.getElementById('clear-chat-btn');
+    const imageInput     = document.getElementById('chat-image-input');
+    const uploadTrigger  = document.getElementById('upload-image-trigger');
+    const agentBadge     = document.getElementById('current-agent-badge');
 
-    if (window.currentUserRole) {
-        currentRole = window.currentUserRole;
-        if (currentRole === 'teacher') currentAgentName = '班主任助手模型';
-        if (currentRole === 'admin') currentAgentName = '管理员监控模型';
-        currentAgentBadge.innerHTML = `<i class="fas fa-robot me-1"></i> ${currentAgentName}`;
+    // ── Role detection ───────────────────────────────────────
+    let currentRole = window.currentUserRole || 'student';
+    const roleLabels = {
+        student: '学生助手',
+        teacher: '教师助手',
+        admin:   '管理员助手'
+    };
+    if (agentBadge) {
+        agentBadge.innerHTML = `<i class="fas fa-robot me-1"></i>${roleLabels[currentRole] || '智能助手'}`;
     }
 
-    // 添加消息到聊天区域
-    function appendMessage(role, content, echarts_option=null) {
-        const isUser = role === 'user';
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `d-flex mb-4 ${isUser ? 'justify-content-end user-message' : 'ai-message'}`;
-        
-        let avatarHTML = '';
-        if (!isUser) {
-            avatarHTML = `
-                <div class="avatar bg-primary text-white rounded-circle d-flex justify-content-center align-items-center shadow-sm me-3 flex-shrink-0" style="width: 40px; height: 40px;">
-                    <i class="fas fa-robot"></i>
-                </div>`;
-        }
-
-        const bubbleWidth = echarts_option ? '95%' : '75%';
-        let bubbleHTML = `
-            <div class="message-bubble ${isUser ? 'bg-primary text-white' : 'bg-white text-dark'} shadow-sm rounded-4 p-3" style="max-width: ${bubbleWidth}; width: ${echarts_option ? '800px' : 'auto'};">
-                <p class="mb-0" style="white-space: pre-wrap;">${content}</p>
-        `;
-        
-        let chartId = null;
-        if (echarts_option) {
-            chartId = 'chart-' + Date.now();
-            bubbleHTML += `<div id="${chartId}" style="width: 100%; height: 400px; margin-top: 15px;"></div>`;
-        }
-        
-        bubbleHTML += `</div>`;
-
-        msgDiv.innerHTML = isUser ? bubbleHTML : (avatarHTML + bubbleHTML);
-        messagesArea.appendChild(msgDiv);
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-        
-        if (echarts_option && chartId) {
-            setTimeout(() => {
-                const chartDom = document.getElementById(chartId);
-                if (chartDom && window.echarts) {
-                    const myChart = window.echarts.init(chartDom);
-                    myChart.setOption(echarts_option);
-                    window.addEventListener('resize', function() {
-                        myChart.resize();
-                    });
-                } else if (!window.echarts) {
-                    console.error("ECharts is not loaded on this page!");
-                }
-            }, 100);
-        }
-    }
-
-    // 渲染 Agent 思考过程（可折叠面板）
-    function appendThinkingSteps(steps) {
-        if (!steps || steps.length === 0) return;
-
-        const stepId = `thinking-${Date.now()}`;
-        const wrapper = document.createElement('div');
-        wrapper.className = 'd-flex mb-2 ai-message';
-        wrapper.style.paddingLeft = '52px'; // 对齐头像宽度
-
-        const typeIconMap = {
-            'thought': { icon: 'fa-brain', color: '#6f42c1', label: '思考' },
-            'action': { icon: 'fa-bolt', color: '#fd7e14', label: '执行工具' },
-            'observation': { icon: 'fa-database', color: '#198754', label: '工具返回' }
-        };
-
-        let stepsHTML = steps.map((step, idx) => {
-            const t = typeIconMap[step.type] || { icon: 'fa-circle', color: '#6c757d', label: step.type };
-            return `
-                <div class="d-flex align-items-start mb-2">
-                    <span style="color:${t.color}; min-width:90px; font-size:0.8rem; font-weight:600;">
-                        <i class="fas ${t.icon} me-1"></i>${t.label}
-                    </span>
-                    <span class="text-muted" style="font-size:0.82rem; white-space:pre-wrap; word-break:break-all;">${escapeHtml(step.content)}</span>
-                </div>`;
-        }).join('');
-
-        wrapper.innerHTML = `
-            <div style="max-width:85%;">
-                <div class="accordion accordion-flush" id="${stepId}">
-                    <div class="accordion-item border rounded-3 shadow-sm bg-light">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed py-2 px-3 rounded-3" type="button"
-                                data-bs-toggle="collapse" data-bs-target="#${stepId}-body"
-                                style="font-size:0.82rem; background:transparent; color:#6c757d;">
-                                <i class="fas fa-code-branch me-2"></i>
-                                查看 Agent 推理过程（${steps.length} 步）
-                            </button>
-                        </h2>
-                        <div id="${stepId}-body" class="accordion-collapse collapse">
-                            <div class="accordion-body py-2 px-3" style="font-size:0.82rem;">
-                                ${stepsHTML}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-
-        messagesArea.appendChild(wrapper);
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-    }
-
+    // ── Helpers ──────────────────────────────────────────────
     function escapeHtml(text) {
         return String(text)
             .replace(/&/g, '&amp;')
@@ -125,114 +32,254 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/"/g, '&quot;');
     }
 
-    // 显示加载动画
-    function showTypingIndicator() {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = 'd-flex mb-4 ai-message typing-indicator-container';
-        msgDiv.innerHTML = `
-            <div class="avatar bg-primary text-white rounded-circle d-flex justify-content-center align-items-center shadow-sm me-3 flex-shrink-0" style="width: 40px; height: 40px;">
-                <i class="fas fa-robot"></i>
-            </div>
-            <div class="message-bubble bg-white shadow-sm rounded-4 p-3 d-flex align-items-center">
-                <div class="typing-indicator">
-                    <span></span><span></span><span></span>
-                </div>
-            </div>
-        `;
-        messagesArea.appendChild(msgDiv);
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-        return msgDiv;
+    function renderMarkdown(text) {
+        // Simple markdown: **bold**, `code`, newlines
+        return escapeHtml(text)
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/`([^`]+)`/g, '<code style="background:rgba(99,102,241,0.15);padding:0.1em 0.4em;border-radius:4px;font-size:0.85em">$1</code>')
+            .replace(/\n/g, '<br>');
     }
 
-    // 发送文本消息
+    function scrollBottom() {
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+
+    // ── Append final message bubble ──────────────────────────
+    function appendMessage(role, content, echartsOption = null) {
+        const isUser = role === 'user';
+        const wrapper = document.createElement('div');
+        wrapper.className = `d-flex mb-4 align-items-end ${isUser ? 'justify-content-end user-message' : 'ai-message'}`;
+
+        const bubbleMaxW = echartsOption ? '95%' : '78%';
+        const bubbleStyle = `max-width:${bubbleMaxW};`;
+
+        let avatar = '';
+        if (!isUser) {
+            avatar = `<div class="ai-avatar me-2 flex-shrink-0"><i class="fas fa-robot"></i></div>`;
+        }
+
+        const chartId = echartsOption ? `chart-${Date.now()}` : null;
+        const chartHtml = chartId
+            ? `<div id="${chartId}" style="width:100%;height:400px;margin-top:12px;border-radius:8px;overflow:hidden;"></div>`
+            : '';
+
+        const bubbleContent = isUser
+            ? escapeHtml(content)
+            : renderMarkdown(content);
+
+        const bubble = `
+            <div class="message-bubble p-3" style="${bubbleStyle}">
+                <p class="mb-0" style="line-height:1.7;white-space:pre-wrap;">${bubbleContent}</p>
+                ${chartHtml}
+            </div>`;
+
+        wrapper.innerHTML = isUser ? bubble : (avatar + bubble);
+        messagesArea.appendChild(wrapper);
+        scrollBottom();
+
+        if (chartId && window.echarts) {
+            setTimeout(() => {
+                const dom = document.getElementById(chartId);
+                if (dom) {
+                    const chart = window.echarts.init(dom, 'dark');
+                    chart.setOption(echartsOption);
+                    window.addEventListener('resize', () => chart.resize());
+                }
+            }, 120);
+        }
+    }
+
+    // ── Typing indicator ─────────────────────────────────────
+    function showTyping() {
+        const el = document.createElement('div');
+        el.className = 'd-flex mb-4 ai-message align-items-end typing-indicator-container';
+        el.innerHTML = `
+            <div class="ai-avatar me-2 flex-shrink-0"><i class="fas fa-robot"></i></div>
+            <div class="message-bubble p-3">
+                <div class="typing-indicator"><span></span><span></span><span></span></div>
+            </div>`;
+        messagesArea.appendChild(el);
+        scrollBottom();
+        return el;
+    }
+
+    // ── SSE live thinking panel ──────────────────────────────
+    function createLivePanel() {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'd-flex mb-3 ai-message';
+        wrapper.innerHTML = `
+            <div class="ai-avatar me-2 flex-shrink-0" style="opacity:0.6;"><i class="fas fa-cog fa-spin"></i></div>
+            <div class="thinking-panel" style="flex:1;max-width:85%;">
+                <div class="thinking-header" id="thinking-toggle-${Date.now()}">
+                    <i class="fas fa-brain" style="color:var(--primary-light);"></i>
+                    <span style="font-weight:600;color:var(--text-secondary);">Agent 推理中...</span>
+                    <span class="ms-auto" style="color:var(--text-muted);font-size:0.75rem;">点击展开</span>
+                </div>
+                <div class="thinking-body" id="thinking-steps-live"></div>
+            </div>`;
+        messagesArea.appendChild(wrapper);
+        scrollBottom();
+
+        const header = wrapper.querySelector('.thinking-header');
+        const panel  = wrapper.querySelector('.thinking-panel');
+        const body   = wrapper.querySelector('#thinking-steps-live');
+        header.addEventListener('click', () => panel.classList.toggle('open'));
+
+        return { wrapper, body, panel };
+    }
+
+    const typeConfig = {
+        thought:     { label: 'THOUGHT',  cls: 'thought' },
+        action:      { label: 'ACTION',   cls: 'action'  },
+        observation: { label: 'RESULT',   cls: 'observation' },
+    };
+
+    function appendLiveStep(body, msg) {
+        const type = Object.keys(typeConfig).find(k => msg.toLowerCase().startsWith(`[${k}`)) || 'thought';
+        const cfg  = typeConfig[type] || typeConfig.thought;
+        const row  = document.createElement('div');
+        row.className = 'sse-step-ticker';
+        row.innerHTML = `
+            <span class="step-badge ${cfg.cls}">${cfg.label}</span>
+            <span style="color:var(--text-secondary);font-size:0.8rem;line-height:1.5;">${escapeHtml(msg)}</span>`;
+        body.appendChild(row);
+        scrollBottom();
+    }
+
+    // ── Send message (SSE) ───────────────────────────────────
     async function sendMessage() {
         const text = chatInput.value.trim();
         if (!text) return;
 
         appendMessage('user', text);
         chatInput.value = '';
+        sendBtn.disabled = true;
+        chatInput.disabled = true;
 
-        const typingIndicator = showTypingIndicator();
+        // Build the SSE URL + POST via EventSource-compatible method
+        // Since EventSource doesn't support POST, use fetch streaming
+        const token = localStorage.getItem('jwt_token');
+        const headers = {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        };
+
+        let livePanel = null;
 
         try {
-            const response = await fetch(`/api/agent/${currentRole}`, {
+            const response = await fetch('/api/agent/stream', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ message: text })
             });
 
-            const data = await response.json();
-            typingIndicator.remove();
-
-            if (response.ok && data.reply) {
-                // 先展示思考过程（如果有）
-                if (data.thinking_steps && data.thinking_steps.length > 0) {
-                    appendThinkingSteps(data.thinking_steps);
-                }
-                // 再展示最终答案
-                appendMessage('ai', data.reply, data.echarts_option);
-            } else {
-                appendMessage('ai', '系统异常，请检查本地 MiniCPM-V 模型服务是否启动。');
+            if (!response.ok) {
+                appendMessage('ai', `请求失败 (${response.status})，请检查服务状态。`);
+                return;
             }
-        } catch (error) {
-            console.error('Chat error:', error);
-            typingIndicator.remove();
-            appendMessage('ai', '网络错误或本地大模型服务未响应，请检查终端！');
+
+            const reader  = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer    = '';
+            let finalResult = null;
+
+            livePanel = createLivePanel();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                // Parse SSE lines
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // keep incomplete line
+
+                for (const line of lines) {
+                    if (!line.startsWith('data:')) continue;
+                    const raw = line.slice(5).trim();
+                    if (!raw) continue;
+                    try {
+                        const event = JSON.parse(raw);
+                        if (event.type === 'step') {
+                            appendLiveStep(livePanel.body, event.content);
+                        } else if (event.type === 'done') {
+                            finalResult = event;
+                        } else if (event.type === 'error') {
+                            finalResult = { answer: `系统错误: ${event.content}`, echarts_option: null };
+                        }
+                    } catch (_) { /* ignore malformed lines */ }
+                }
+            }
+
+            // Finalise live panel
+            if (livePanel) {
+                const header = livePanel.panel.querySelector('.thinking-header span');
+                if (header) header.textContent = `Agent 推理完成（${livePanel.body.children.length} 步）`;
+                livePanel.panel.querySelector('.ai-avatar .fa-cog')?.classList.remove('fa-spin');
+            }
+
+            // Render final answer
+            if (finalResult) {
+                appendMessage('ai', finalResult.answer || '（无回复）', finalResult.echarts_option);
+            }
+
+        } catch (err) {
+            console.error('[SSE] Error:', err);
+            if (livePanel) livePanel.wrapper.remove();
+            appendMessage('ai', `网络错误：${err.message}`);
+        } finally {
+            sendBtn.disabled = false;
+            chatInput.disabled = false;
+            chatInput.focus();
         }
     }
 
-    // 处理图片上传进行 OCR
+    // ── Image upload (OCR) ───────────────────────────────────
     async function handleImageUpload(e) {
         const file = e.target.files[0];
         if (!file) return;
-
-        appendMessage('user', `[上传了一张图片: ${file.name}]`);
-        const typingIndicator = showTypingIndicator();
+        appendMessage('user', `[上传图片: ${file.name}]`);
+        const typing = showTyping();
 
         const reader = new FileReader();
-        reader.onload = async function(event) {
-            const base64String = event.target.result.split(',')[1];
-
+        reader.onload = async function (ev) {
+            const b64 = ev.target.result.split(',')[1];
             try {
-                const response = await fetch('/api/edge/ocr', {
+                const res  = await fetch('/api/edge/ocr', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_base64: base64String })
+                    body: JSON.stringify({ image_base64: b64 })
                 });
-
-                const data = await response.json();
-                typingIndicator.remove();
-
-                if (response.ok && data.data) {
-                    const extracted = data.data;
-                    let replyText = `📸 端侧隐私提取完成\n\n已成功从图片中提取结构化数据，且图片原件已被内存销毁。\n提取结果：\n`;
-                    replyText += `• 学号: ${extracted.sno || '未知'}\n`;
-                    replyText += `• 成绩: ${extracted.score || '未知'}\n\n`;
-                    replyText += `你可以继续问我关于如何提高成绩的建议！`;
-                    appendMessage('ai', replyText);
+                const data = await res.json();
+                typing.remove();
+                if (res.ok && data.data) {
+                    const d = data.data;
+                    appendMessage('ai',
+                        `端侧隐私提取完成\n\n已从图片提取结构化数据，原图已内存销毁。\n\n学号：${d.sno || '未知'}\n成绩：${d.score || '未知'}\n\n你可以继续询问成绩分析建议！`
+                    );
                 } else {
-                    appendMessage('ai', `图片解析失败: ${data.error || '未知错误'}`);
+                    appendMessage('ai', `图片解析失败：${data.error || '未知错误'}`);
                 }
-            } catch (error) {
-                console.error('OCR error:', error);
-                typingIndicator.remove();
-                appendMessage('ai', 'OCR解析服务出错，请检查 MiniCPM-V 是否在本地运行！');
+            } catch (err) {
+                typing.remove();
+                appendMessage('ai', `OCR 服务异常：${err.message}`);
             }
         };
         reader.readAsDataURL(file);
         e.target.value = '';
     }
 
-    // 事件绑定
+    // ── Event bindings ───────────────────────────────────────
     sendBtn.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') sendMessage();
+    chatInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
     });
-
-    uploadTrigger.addEventListener('click', () => imageInput.click());
-    imageInput.addEventListener('change', handleImageUpload);
-
-    clearBtn.addEventListener('click', () => {
+    uploadTrigger?.addEventListener('click', () => imageInput.click());
+    imageInput?.addEventListener('change', handleImageUpload);
+    clearBtn?.addEventListener('click', () => {
         while (messagesArea.children.length > 1) {
             messagesArea.removeChild(messagesArea.lastChild);
         }

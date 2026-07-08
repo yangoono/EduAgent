@@ -458,59 +458,87 @@
                 <!-- AI智能助手视图 -->
                 <div id="ai-assistant-view" class="view">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h1 class="h2 mb-0 text-primary"><i class="fas fa-robot me-2"></i>全模态智能助手</h1>
-                        <span class="badge bg-primary px-3 py-2 rounded-pill shadow-sm" id="current-agent-badge">
-                            <i class="fas fa-user-graduate me-1"></i> 学生助手模型
+                        <div>
+                            <h1 class="h3 mb-1 fw-bold" style="color:var(--primary-light);">
+                                <i class="fas fa-robot me-2"></i>智能教务助手
+                            </h1>
+                            <p class="mb-0" style="color:var(--text-muted);font-size:0.82rem;">
+                                Coordinator-Worker 分层多智能体架构 · 实时流式推理
+                            </p>
+                        </div>
+                        <span class="badge px-3 py-2 rounded-pill" id="current-agent-badge"
+                              style="background:linear-gradient(135deg,var(--primary-dark),var(--accent));font-size:0.8rem;">
+                            <i class="fas fa-user-graduate me-1"></i>学生助手
                         </span>
                     </div>
-                    
-                    <div class="card shadow-lg border-0 rounded-4 overflow-hidden chat-container" style="height: 70vh;">
-                        <div class="card-header bg-white border-bottom-0 py-3 px-4 d-flex justify-content-between align-items-center">
+
+                    <div class="card chat-container shadow-lg" style="height:72vh;">
+                        <!-- Header -->
+                        <div class="card-header d-flex justify-content-between align-items-center">
                             <div>
-                                <h5 class="mb-0 fw-bold">Planner &rarr; Informer &rarr; Retriever</h5>
-                                <small class="text-muted">
-                                    <i class="fas fa-cloud text-primary me-1"></i>DeepSeek Planner &nbsp;|&nbsp;
-                                    <i class="fas fa-database text-warning me-1"></i>DeepSeek SQL Informer &nbsp;|&nbsp;
-                                    <i class="fas fa-lock text-success me-1"></i>本地 BGE Retriever
-                                </small>
+                                <h6 class="mb-1 fw-semibold" style="color:var(--text-primary);">
+                                    Coordinator &rarr; SheetAgent / PolicyWorker / DataWorker
+                                </h6>
+                                <div style="font-size:0.75rem;color:var(--text-muted);">
+                                    <i class="fas fa-bolt me-1" style="color:var(--primary-light);"></i>并发调度
+                                    &nbsp;·&nbsp;
+                                    <i class="fas fa-brain me-1" style="color:var(--accent);"></i>长效记忆
+                                    &nbsp;·&nbsp;
+                                    <i class="fas fa-shield-alt me-1" style="color:var(--success);"></i>沙盒安全
+                                    &nbsp;·&nbsp;
+                                    <i class="fas fa-stream me-1" style="color:var(--warning);"></i>实时流式
+                                </div>
                             </div>
                             <div class="dropdown">
-                                <button class="btn btn-light btn-sm rounded-circle shadow-sm" type="button" data-bs-toggle="dropdown">
-                                    <i class="fas fa-ellipsis-v"></i>
+                                <button class="btn btn-sm rounded-circle" type="button" data-bs-toggle="dropdown"
+                                        style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-secondary);width:32px;height:32px;">
+                                    <i class="fas fa-ellipsis-v" style="font-size:0.75rem;"></i>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
-                                    <li><a class="dropdown-item" href="#" id="clear-chat-btn"><i class="fas fa-trash-alt me-2 text-danger"></i>清空对话</a></li>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" id="clear-chat-btn">
+                                        <i class="fas fa-trash-alt me-2" style="color:var(--danger);"></i>清空对话
+                                    </a></li>
                                 </ul>
                             </div>
                         </div>
-                        
-                        <div class="card-body bg-light chat-messages px-4 py-3" id="chat-messages-area" style="overflow-y: auto;">
-                            <!-- 欢迎消息 -->
-                            <div class="d-flex mb-4">
-                                <div class="avatar bg-primary text-white rounded-circle d-flex justify-content-center align-items-center shadow-sm me-3" style="width: 40px; height: 40px;">
-                                    <i class="fas fa-robot"></i>
-                                </div>
-                                <div class="message-bubble bg-white shadow-sm rounded-4 p-3" style="max-width: 75%;">
-                                    <p class="mb-0">你好！我是你的专属校园智能助手。你可以问我关于成绩提升、选课规划的问题，或者直接上传成绩单图片，我会用端侧视觉模型帮你安全地提取信息并销毁原图！📸</p>
+
+                        <!-- Messages -->
+                        <div class="card-body chat-messages" id="chat-messages-area" style="overflow-y:auto;flex:1;">
+                            <!-- Welcome message -->
+                            <div class="d-flex mb-4 align-items-end ai-message">
+                                <div class="ai-avatar me-2 flex-shrink-0"><i class="fas fa-robot"></i></div>
+                                <div class="message-bubble p-3" style="max-width:78%;">
+                                    <p class="mb-0" style="line-height:1.7;">
+                                        你好！我是 <strong style="color:var(--primary-light);">EduAgent 智能助手</strong>，由 Coordinator 统一调度多个专业 Worker 为你服务。<br><br>
+                                        你可以问我：<br>
+                                        📊 <strong>数据分析</strong> — "帮我画出我的成绩趋势图"<br>
+                                        📋 <strong>规章检索</strong> — "毕业需要多少学分？"<br>
+                                        🔢 <strong>精确查询</strong> — "我这学期选了哪些课？"<br><br>
+                                        <span style="color:var(--text-muted);font-size:0.85em;">你也可以上传成绩单图片，端侧视觉模型会安全提取并销毁原图 📸</span>
+                                    </p>
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="card-footer bg-white border-top-0 p-3">
-                            <div class="input-group bg-light rounded-pill p-1 shadow-sm border border-2 border-white">
-                                <button class="btn btn-link text-muted px-3" type="button" id="upload-image-trigger" title="上传敏感图片 (OCR提取)">
-                                    <i class="fas fa-camera fs-5"></i>
+
+                        <!-- Input -->
+                        <div class="card-footer p-3">
+                            <div class="chat-input-wrap d-flex align-items-center">
+                                <button class="btn btn-sm me-1 flex-shrink-0" type="button"
+                                        id="upload-image-trigger" title="上传图片 (端侧OCR)"
+                                        style="background:transparent;border:none;color:var(--text-muted);padding:0.3rem 0.6rem;">
+                                    <i class="fas fa-camera fs-6"></i>
                                 </button>
-                                <input type="file" id="chat-image-input" accept="image/*" style="display: none;">
-                                <input type="text" class="form-control bg-transparent border-0 shadow-none px-3" id="chat-input" placeholder="输入你想问的问题...">
-                                <button class="btn btn-primary rounded-pill px-4 ms-1 shadow-sm" type="button" id="send-msg-btn">
+                                <input type="file" id="chat-image-input" accept="image/*" style="display:none;">
+                                <input type="text" class="form-control" id="chat-input"
+                                       placeholder="输入你的问题，按 Enter 发送…" autocomplete="off">
+                                <button class="chat-send-btn flex-shrink-0 ms-2" type="button" id="send-msg-btn">
                                     <i class="fas fa-paper-plane me-1"></i>发送
                                 </button>
-                            </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
 
             </div>
 
