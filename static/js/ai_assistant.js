@@ -4,8 +4,8 @@
  */
 document.addEventListener('DOMContentLoaded', function () {
 
-    const chatInput      = document.getElementById('chat-input');
-    const sendBtn        = document.getElementById('send-msg-btn');
+    const chatInput      = document.getElementById('ai-chat-input');
+    const sendBtn        = document.getElementById('send-btn');
     const messagesArea   = document.getElementById('chat-messages-area');
     const clearBtn       = document.getElementById('clear-chat-btn');
     const imageInput     = document.getElementById('chat-image-input');
