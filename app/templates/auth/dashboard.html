@@ -1,0 +1,715 @@
+{% extends "auth/base.html" %}
+
+{% block content %}
+<!-- 外部资源链接 -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script>
+    window.currentUserRole = "{{ current_user.role }}";
+    window.currentUserSno = "{{ current_user.sno }}";
+</script>
+
+<div class="row g-0">
+    <!-- 左侧导航栏 -->
+    <nav class="col-lg-2 col-md-3 bg-white p-3 shadow-sm sidebar">
+        <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+            <a class="nav-link active d-flex align-items-center mb-2" href="#" data-view="dashboard-view">
+                <i class="fas fa-chart-pie fa-fw me-2"></i> 数据仪表盘
+            </a>
+            {% if current_user.role in ['admin', 'teacher'] %}
+            <a class="nav-link d-flex align-items-center mb-2" href="#" data-view="students-view">
+                <i class="fas fa-users fa-fw me-2"></i> 学生管理
+            </a>
+            <a class="nav-link d-flex align-items-center mb-2" href="#" data-view="courses-view">
+                <i class="fas fa-book fa-fw me-2"></i> 课程管理
+            </a>
+            {% endif %}
+            {% if current_user.role == 'admin' %}
+            <a class="nav-link d-flex align-items-center mb-2" href="#" data-view="knowledge-view">
+                <i class="fas fa-database fa-fw me-2"></i> 知识库管理
+            </a>
+            {% endif %}
+            <a class="nav-link d-flex align-items-center mb-2" href="#" data-view="scores-view">
+                <i class="fas fa-clipboard-list fa-fw me-2"></i> 成绩管理
+            </a>
+            <hr class="my-2">
+            <a class="nav-link d-flex align-items-center ai-nav-link" href="#" data-view="ai-assistant-view">
+                <i class="fas fa-robot fa-fw me-2"></i> 智能助手
+            </a>
+        </div>
+    </nav>
+
+    <!-- 主要内容区 -->
+    <main class="col-lg-10 col-md-9 p-4 main-content">
+        <div class="row g-4">
+            <div id="main-content-area" class="col-12">
+                <!-- 数据仪表盘  -->
+                <div id="dashboard-view" class="view active">
+                    <h1 class="h2 mb-4 fw-bold text-dark">数据仪表盘 <span class="badge bg-primary fs-6">{{ current_user.role|capitalize }}</span></h1>
+
+                    {% if current_user.role == 'student' %}
+                    <!-- 学生端专用视图 -->
+                    <!-- 排名横幅 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card shadow-sm border-0 rounded-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                <div class="card-body p-4 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h4 class="fw-bold mb-1"><i class="fas fa-trophy text-warning me-2"></i>专业排名分析</h4>
+                                        <p class="mb-0 opacity-75" id="student-dept-label">正在加载排名数据...</p>
+                                    </div>
+                                    <div class="text-end">
+                                        <h2 class="fw-bold mb-0" id="student-rank-display">-- / --</h2>
+                                        <p class="mb-0 opacity-75" id="student-beat-display">击败了 --% 的同级同学</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-4 mb-4">
+                        <div class="col-xl-4 col-lg-6">
+                            <div class="card h-100 shadow-sm border-0 rounded-4" style="background: linear-gradient(145deg, #ffffff, #f5f7fa);">
+                                <div class="card-body">
+                                    <h5 class="card-title fw-bold text-secondary mb-3"><i class="fas fa-bullseye text-primary me-2"></i>个人能力画像</h5>
+                                    <div id="radar-chart" style="width: 100%; height: 320px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4 col-lg-6">
+                            <div class="card h-100 shadow-sm border-0 rounded-4" id="warning-card-container">
+                                <div class="card-body d-flex flex-column justify-content-center align-items-center text-center">
+                                    <h5 class="card-title fw-bold text-secondary mb-3 w-100 text-start"><i class="fas fa-exclamation-triangle text-warning me-2"></i>学业预警状态 (桂电教〔2025〕28号)</h5>
+                                    
+                                    <div id="warning-icon-container" class="p-3 rounded-circle bg-light mb-2" style="width: 110px; height: 110px; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+                                        <i id="warning-icon" class="fas fa-spinner fa-spin text-secondary" style="font-size: 3rem;"></i>
+                                    </div>
+                                    
+                                    <h4 id="warning-title" class="fw-bold text-secondary">加载中...</h4>
+                                    <p id="warning-desc" class="text-muted mt-1 mb-0" style="font-size: 0.9rem;">正在分析成绩数据，请稍候...</p>
+                                    
+                                    <div class="mt-3 w-100 px-3">
+                                        <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                                            <span class="text-muted" style="font-size: 0.9rem;">不及格必修课</span>
+                                            <span class="fw-bold" id="failed-count-display">0 门</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span class="text-muted" style="font-size: 0.9rem;">不及格总学分</span>
+                                            <span class="fw-bold" id="failed-credits-display">0 学分</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4 col-lg-12">
+                            <div class="card h-100 shadow-sm border-0 rounded-4" style="background: linear-gradient(145deg, #ffffff, #fdfbfb);">
+                                <div class="card-body">
+                                    <h5 class="card-title fw-bold text-secondary mb-3"><i class="fas fa-tachometer-alt text-success me-2"></i>同专业超越率</h5>
+                                    <div id="gauge-chart" style="width: 100%; height: 320px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-4 mb-4">
+                        <div class="col-12">
+                            <div class="card shadow-sm border-0 rounded-4">
+                                <div class="card-body">
+                                    <h5 class="card-title fw-bold text-secondary mb-3"><i class="fas fa-chart-bar text-info me-2"></i>全景成绩与学分图谱</h5>
+                                    <div id="detailed-bar-chart" style="width: 100%; height: 400px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- 教师/管理员端专用宏观视图 -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-xl-6 col-lg-12">
+                            <div class="card h-100 shadow-sm border-0 rounded-4">
+                                <div class="card-body">
+                                    <h5 class="card-title fw-bold text-secondary mb-3"><i class="fas fa-chart-bar text-info me-2"></i>各专业平均分统计</h5>
+                                    <div id="dept-avg-chart" style="width: 100%; height: 350px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-6 col-lg-12">
+                            <div class="card h-100 shadow-sm border-0 rounded-4">
+                                <div class="card-body">
+                                    <h5 class="card-title fw-bold text-secondary mb-3"><i class="fas fa-map-marked-alt text-success me-2"></i>学生生源地分布</h5>
+                                    <div id="origin-chart" style="width: 100%; height: 350px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-4 mb-4">
+                        <div class="col-xl-12">
+                            <div class="card shadow-sm border-0 rounded-4" style="background: linear-gradient(145deg, #ffffff, #f0f4f8);">
+                                <div class="card-body">
+                                    <h5 class="card-title fw-bold text-secondary mb-3"><i class="fas fa-project-diagram text-primary me-2"></i>课程关联分析 (Apriori 支持度聚合)</h5>
+                                    <p class="text-muted small">展示同时及格概率较高的课程组合（频繁项集）。节点越大代表该课程及格人数越多，连线代表存在强关联规则。</p>
+                                    <div id="correlation-chart" style="width: 100%; height: 500px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-4">
+                        <div class="col-12">
+                            <div class="card shadow-sm border-0 rounded-4">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5 class="card-title fw-bold text-secondary mb-0"><i class="fas fa-search text-warning me-2"></i>课程分布下钻查询</h5>
+                                        <select id="course-dist-select" class="form-select w-auto shadow-sm rounded-pill"></select>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 border-end">
+                                            <div id="pie-chart" style="width: 100%; height: 350px;"></div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div id="boxplot-chart" style="width: 100%; height: 350px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- 学生管理视图-->
+                <div id="students-view" class="view">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h1 class="h2 mb-0">学生管理</h1>
+                        <div class="d-flex">
+                            <button id="export-student-csv" class="btn btn-outline-secondary me-2">
+                                <i class="fas fa-file-export me-2"></i>导出CSV
+                            </button>
+                            <button id="import-student-csv" class="btn btn-outline-secondary me-2">
+                                <i class="fas fa-file-import me-2"></i>上传CSV
+                            </button>
+                            <button id="add-student-btn" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>添加学生
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter text-muted me-2"></i>
+                                查询学生
+                            </h5>
+                        </div>
+                        <div class="card-body py-3">
+                            <form id="student-search-form" class="row g-3 align-items-end">
+                                <div class="col-md-4">
+                                    <label for="student-search-input" class="form-label text-muted small mb-1">学号/姓名</label>
+                                    <div class="input-group shadow-sm rounded-3">
+                                        <span class="input-group-text bg-white border-end-0 rounded-start-3">
+                                            <i class="fas fa-user-graduate"></i>
+                                        </span>
+                                        <input type="text" id="student-search-input" class="form-control border-start-0 rounded-end-3" placeholder="输入学号或姓名" style="box-shadow:none;">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="student-search-grade" class="form-label text-muted small mb-1">年级</label>
+                                    <div class="input-group shadow-sm rounded-3">
+                                        <span class="input-group-text bg-white border-end-0 rounded-start-3">
+                                            <i class="fas fa-calendar-alt"></i>
+                                        </span>
+                                        <input type="text" id="student-search-grade" class="form-control border-start-0 rounded-end-3" placeholder="输入年级" style="box-shadow:none;">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="student-search-class" class="form-label text-muted small mb-1">班级</label>
+                                    <div class="input-group shadow-sm rounded-3">
+                                        <span class="input-group-text bg-white border-end-0 rounded-start-3">
+                                            <i class="fas fa-users"></i>
+                                        </span>
+                                        <input type="text" id="student-search-class" class="form-control border-start-0 rounded-end-3" placeholder="输入班级" style="box-shadow:none;">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="student-search-dept" class="form-label text-muted small mb-1">专业</label>
+                                    <div class="input-group shadow-sm rounded-3">
+                                        <span class="input-group-text bg-white border-end-0 rounded-start-3">
+                                            <i class="fas fa-graduation-cap"></i>
+                                        </span>
+                                        <select id="student-search-dept" class="form-select border-start-0 rounded-end-3" style="box-shadow:none;">
+                                            <option value="">所有专业</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 d-grid">
+                                    <label class="form-label text-white small mb-1" style="visibility:hidden;">查找</label>
+                                    <button type="submit" class="btn btn-primary w-100 shadow-sm rounded-3">
+                                        <i class="fas fa-search me-1"></i>查找/筛选
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                               
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>学号</th><th>姓名</th><th>性别</th><th>年龄</th><th>专业</th><th>籍贯</th><th class="text-end">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="student-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 课程管理视图 -->
+                <div id="courses-view" class="view">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h1 class="h2">课程管理</h1>
+                        <div>
+                            <button id="export-course-csv" class="btn btn-outline-secondary me-2">
+                                <i class="fas fa-file-export me-2"></i>导出CSV
+                            </button>
+                            <button id="import-course-csv" class="btn btn-outline-secondary me-2">
+                                <i class="fas fa-file-import me-2"></i>上传CSV
+                            </button>
+                            <button id="add-course-btn" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>添加课程
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 搜索筛选卡片 -->
+                    <div class="card shadow-sm mb-4 border-0">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter text-muted me-2"></i>
+                                课程查询与筛选
+                            </h5>
+                        </div>
+                        <div class="card-body py-3">
+                            <form id="course-search-form" class="row g-3 align-items-end">
+                                <div class="col-md-4">
+                                    <label for="course-search-input" class="form-label small text-muted">课程号/名称</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-white border-end-0">
+                                            <i class="fas fa-search text-muted"></i>
+                                        </span>
+                                        <input type="text" id="course-search-input" class="form-control border-start-0" 
+                                            placeholder="输入课程号或课程名">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="course-search-teacher" class="form-label small text-muted">授课教师</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-white border-end-0">
+                                            <i class="fas fa-user-tie text-muted"></i>
+                                        </span>
+                                        <input type="text" id="course-search-teacher" class="form-control border-start-0" 
+                                            placeholder="输入教师姓名">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="course-search-credit" class="form-label small text-muted">学分</label>
+                                    <select id="course-search-credit" class="form-select">
+                                        <option value="">全部</option>
+                                        <option value="1">1学分</option>
+                                        <option value="2">2学分</option>
+                                        <option value="3">3学分</option>
+                                        <option value="4">4学分</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2 d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search me-1"></i>查询
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light"><tr>
+                                        <th>课程号</th><th>课程名</th><th>先修课程号</th><th>学分</th><th>教师</th><th class="text-end">操作</th>
+                                    </tr></thead>
+                                    <tbody id="course-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 成绩管理视图 -->
+                <div id="scores-view" class="view">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h1 class="h2 mb-0">成绩管理</h1>
+                        {% if current_user.role in ['admin', 'teacher'] %}
+                        <div>
+                            <button id="export-score-csv" class="btn btn-outline-secondary me-2">
+                                <i class="fas fa-file-export me-2"></i>导出CSV
+                            </button>
+                            <button id="import-score-csv" class="btn btn-outline-secondary">
+                                <i class="fas fa-file-import me-2"></i>上传CSV
+                            </button>
+                        </div>
+                        <button id="add-score-btn" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>添加成绩
+                        </button>
+                        {% endif %}
+                    </div>
+                    <div class="card shadow-sm mb-4 border-0">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter text-muted me-2"></i>
+                                成绩查询与筛选
+                            </h5>
+                        </div>
+                        <div class="card-body py-3">
+                            <form id="score-form" class="row g-3 align-items-end">
+                                <div class="col-md-4">
+                                    <label for="score-sno" class="form-label small text-muted">学生</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-white border-end-0">
+                                            <i class="fas fa-user-graduate text-muted"></i>
+                                        </span>
+                                        <input type="text" id="score-sno" class="form-control border-start-0" 
+                                            placeholder="输入学生姓名或者学号" {% if current_user.role == 'student' %} value="{{ current_user.sno }}" readonly {% endif %}>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="score-cno" class="form-label small text-muted">课程</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-white border-end-0">
+                                            <i class="fas fa-book text-muted"></i>
+                                        </span>
+                                        <input type="text" id="score-cno" class="form-control border-start-0" 
+                                            placeholder="输入课程号或课程名">
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="score-range" class="form-label small text-muted">成绩范围</label>
+                                    <select id="score-range" class="form-select">
+                                        <option value="">全部</option>
+                                        <option value="90-100">90-100分</option>
+                                        <option value="80-89">80-89分</option>
+                                        <option value="70-79">70-79分</option>
+                                        <option value="60-69">60-69分</option>
+                                        <option value="0-59">0-59分</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2 d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search me-1"></i>查询
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light"><tr>
+                                        <th>学号</th><th>姓名</th><th>课程名</th><th>成绩</th>
+                                        <th class="text-end">操作</th>
+                                    </tr></thead>
+                                    <tbody id="score-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 知识库管理视图 -->
+                <div id="knowledge-view" class="view">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h1 class="h2 mb-0">知识库管理</h1>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#upload-pdf-modal">
+                            <i class="fas fa-file-pdf me-2"></i>上传PDF规章制度
+                        </button>
+                    </div>
+                    
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>文档分块标题</th>
+                                            <th>内容预览</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="knowledge-table-body">
+                                        <!-- AJAX Populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI智能助手视图 -->
+                <div id="ai-assistant-view" class="view">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h1 class="h2 mb-0 text-primary"><i class="fas fa-robot me-2"></i>全模态智能助手</h1>
+                        <span class="badge bg-primary px-3 py-2 rounded-pill shadow-sm" id="current-agent-badge">
+                            <i class="fas fa-user-graduate me-1"></i> 学生助手模型
+                        </span>
+                    </div>
+                    
+                    <div class="card shadow-lg border-0 rounded-4 overflow-hidden chat-container" style="height: 70vh;">
+                        <div class="card-header bg-white border-bottom-0 py-3 px-4 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0 fw-bold">Planner &rarr; Informer &rarr; Retriever</h5>
+                                <small class="text-muted">
+                                    <i class="fas fa-cloud text-primary me-1"></i>DeepSeek Planner &nbsp;|&nbsp;
+                                    <i class="fas fa-database text-warning me-1"></i>DeepSeek SQL Informer &nbsp;|&nbsp;
+                                    <i class="fas fa-lock text-success me-1"></i>本地 BGE Retriever
+                                </small>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-light btn-sm rounded-circle shadow-sm" type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+                                    <li><a class="dropdown-item" href="#" id="clear-chat-btn"><i class="fas fa-trash-alt me-2 text-danger"></i>清空对话</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="card-body bg-light chat-messages px-4 py-3" id="chat-messages-area" style="overflow-y: auto;">
+                            <!-- 欢迎消息 -->
+                            <div class="d-flex mb-4">
+                                <div class="avatar bg-primary text-white rounded-circle d-flex justify-content-center align-items-center shadow-sm me-3" style="width: 40px; height: 40px;">
+                                    <i class="fas fa-robot"></i>
+                                </div>
+                                <div class="message-bubble bg-white shadow-sm rounded-4 p-3" style="max-width: 75%;">
+                                    <p class="mb-0">你好！我是你的专属校园智能助手。你可以问我关于成绩提升、选课规划的问题，或者直接上传成绩单图片，我会用端侧视觉模型帮你安全地提取信息并销毁原图！📸</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-footer bg-white border-top-0 p-3">
+                            <div class="input-group bg-light rounded-pill p-1 shadow-sm border border-2 border-white">
+                                <button class="btn btn-link text-muted px-3" type="button" id="upload-image-trigger" title="上传敏感图片 (OCR提取)">
+                                    <i class="fas fa-camera fs-5"></i>
+                                </button>
+                                <input type="file" id="chat-image-input" accept="image/*" style="display: none;">
+                                <input type="text" class="form-control bg-transparent border-0 shadow-none px-3" id="chat-input" placeholder="输入你想问的问题...">
+                                <button class="btn btn-primary rounded-pill px-4 ms-1 shadow-sm" type="button" id="send-msg-btn">
+                                    <i class="fas fa-paper-plane me-1"></i>发送
+                                </button>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<!-- 弹窗 -->
+<div class="modal fade" id="student-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="student-modal-title">添加学生</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="student-form">
+                    <input type="hidden" id="student-sno-hidden">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">学号</label><input id="student-sno" type="text" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">姓名</label><input id="student-sname" type="text" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">性别</label><select id="student-ssex" class="form-select"><option>男</option><option>女</option></select></div>
+                        <div class="col-md-6"><label class="form-label">年龄</label><input id="student-sage" type="number" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">专业</label><input id="student-sdept" type="text" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">籍贯</label><input id="student-hometown" type="text" class="form-control"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" id="save-student-btn" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="course-modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="course-modal-title">添加课程</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="course-form">
+                    <input type="hidden" id="course-cno-hidden">
+                    <div class="mb-3"><label class="form-label">课程号</label><input id="course-cno" type="text" class="form-control"></div>
+                    <div class="mb-3"><label class="form-label">课程名</label><input id="course-cname" type="text" class="form-control"></div>
+                    <div class="mb-3"><label class="form-label">先修课程号</label><select id="course-cpno" class="form-select"></select></div>
+                    <div class="mb-3"><label class="form-label">学分</label><input id="course-ccredit" type="number" class="form-control"></div>
+                    <div class="mb-3"><label class="form-label">教师</label><input id="course-cteacher" type="text" class="form-control"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" id="save-course-btn" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="csv-upload-modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">上传CSV文件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="csv-upload-form">
+                    <div class="mb-3">
+                        <label for="csv-file" class="form-label">选择CSV文件</label>
+                        <input class="form-control" type="file" id="csv-file" accept=".csv">
+                    </div>
+                   <div id="csv-tip-students" class="alert alert-info" style="display:none;">
+                        <small>请确保CSV文件格式正确，第一行包含列标题(学号，姓名，性别，年龄，专业，籍贯)</small>
+                    </div>
+                    <div id="csv-tip-courses" class="alert alert-info" style="display:none;">
+                        <small>请确保CSV文件格式正确，第一行包含列标题(课程号，课程名，先修课程号，学分，教师)</small>
+                    </div>
+                    <div id="csv-tip-scores" class="alert alert-info" style="display:none;">
+                        <small>请确保CSV文件格式正确，第一行包含列标题(学号，课程号，成绩)</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" id="confirm-csv-upload" class="btn btn-primary">上传</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="score-modal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">添加成绩</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="score-modal-form">
+            <div class="mb-3">
+              <label class="form-label">学号</label>
+              <input id="score-modal-sno" type="text" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">课程号</label>
+                <select id="score-modal-cno" class="form-select"></select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">成绩</label>
+              <input id="score-modal-score" type="number" class="form-control">
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" id="save-score-btn" class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- Upload PDF Modal -->
+<div class="modal fade" id="upload-pdf-modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">上传规章制度 (PDF)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="upload-pdf-form">
+                    <div class="mb-3">
+                        <label for="pdf-file" class="form-label">选择 PDF 文件</label>
+                        <input class="form-control" type="file" id="pdf-file" accept=".pdf" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" id="confirm-pdf-upload" class="btn btn-primary">
+                    <span id="pdf-upload-spinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+                    开始解析并存入知识库
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 外部JavaScript文件链接 -->
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/csv_handler.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/student_manager.js') }}"></script>
+<script src="{{ url_for('static', filename='js/course_manager.js') }}"></script>
+<script src="{{ url_for('static', filename='js/score_manager.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ai_assistant.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/knowledge_manager.js') }}"></script>
+
+<!-- JWT Token Handler -->
+<script>
+    // Extract temp_token from cookie if it exists
+    const cookies = document.cookie.split(';');
+    let tempToken = null;
+    for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.startsWith('temp_token=')) {
+            tempToken = cookie.substring('temp_token='.length);
+            break;
+        }
+    }
+    
+    if (tempToken) {
+        localStorage.setItem('jwt_token', tempToken);
+        // Delete the cookie
+        document.cookie = "temp_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+    
+    // Override global fetch to always attach Authorization header
+    const originalFetch = window.fetch;
+    window.fetch = async function() {
+        let [resource, config] = arguments;
+        const token = localStorage.getItem('jwt_token');
+        if (token && resource && resource.toString().startsWith('/api/')) {
+            if (!config) {
+                config = {};
+            }
+            if (!config.headers) {
+                config.headers = {};
+            }
+            // Handle headers if they are a Headers object
+            if (config.headers instanceof Headers) {
+                config.headers.append('Authorization', 'Bearer ' + token);
+            } else {
+                config.headers['Authorization'] = 'Bearer ' + token;
+            }
+        }
+        return originalFetch(resource, config);
+    };
+</script>
+{% endblock %}

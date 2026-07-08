@@ -1,0 +1,90 @@
+{% extends 'auth/base.html' %}
+
+{% block content %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/login_style.css">
+<body>
+    <div class="container">
+        <div class="login-container">
+            <div class="login-header">
+                <h2>欢迎登录</h2>
+                <p class="text-muted">请输入您的账号信息</p>
+            </div>
+            
+            <div class="tab-switcher">
+                <button id="snoTab" class="active">学号登录</button>
+                <button id="phoneTab">手机号登录</button>
+                <button id="emailTab">邮箱登录</button>
+            </div>
+            
+            <form id="loginForm" method="POST" action="{{ url_for('login') }}" novalidate>
+                {{ form.hidden_tag() }}
+                
+                <!-- 学号登录部分 -->
+                <div id="snoLogin" class="login-method">
+                    <div class="mb-3">
+                        <label for="sno" class="form-label">学号/工号</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                            {{ form.sno(class="form-control", id="sno", placeholder="请输入您的学号或工号") }}
+                        </div>
+                        <div class="invalid-feedback" id="snoError"></div>
+                    </div>
+                </div>
+
+                <!-- 手机号登录部分 -->
+                <div id="phoneLogin" class="login-method" style="display: none;">
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">手机号</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-phone"></i></span>
+                            {{ form.phone(class="form-control", id="phone", placeholder="请输入11位手机号") }}
+                        </div>
+                        <div class="invalid-feedback" id="phoneError"></div>
+                    </div>
+                </div>
+                
+                <!-- 邮箱登录部分 -->
+                <div id="emailLogin" class="login-method" style="display: none;">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">邮箱</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                            {{ form.email(class="form-control", id="email", placeholder="请输入邮箱地址") }}
+                        </div>
+                        <div class="invalid-feedback" id="emailError"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="password" class="form-label">密码</label>
+                        <div class="password-input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            {{ form.password(class="form-control", id="password", placeholder="请输入密码") }}
+                            <div class="password-toggle-container">
+                                <i class="bi bi-eye-slash password-toggle" id="togglePassword"></i>
+                            </div>
+                        </div>
+                    <div class="invalid-feedback" id="passwordError"></div>
+                </div>
+                
+                <div class="mb-3 form-check">
+                    {{ form.remember_me(class="form-check-input", id="rememberMe") }}
+                    <label class="form-check-label" for="rememberMe">记住我</label>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-login w-100">登 录</button>
+                
+                <div class="login-footer">
+                    <span class="mx-2">
+                    <a href="{{ url_for('register') }}">注册账号</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/login.js') }}"></script>
+</body>
+{% endblock %}
+</html>

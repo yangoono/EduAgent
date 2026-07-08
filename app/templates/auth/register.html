@@ -1,0 +1,193 @@
+{% extends 'auth/base.html' %}
+
+{% block content %}
+{% for field, errors in form.errors.items() %}
+  {% for error in errors %}
+    <div class="alert alert-danger">{{ error }}</div>
+  {% endfor %}
+{% endfor %}
+<link rel="stylesheet" href="/static/css/register.css">
+<body>
+    <div class="container">
+        <div class="register-container">
+            <div class="register-header">
+                <h2>注册新账号</h2>
+                <p class="text-muted">请填写以下信息</p>
+            </div>
+            
+            <form id="registerForm" method="POST" action="{{ url_for('register') }}" novalidate>
+                {{ form.hidden_tag() }}
+                
+                <!-- OCR 自动填表组件 -->
+                <div class="mb-4 p-3 border border-dashed rounded-3 bg-light text-center shadow-sm">
+                    <label class="form-label fw-bold d-block text-primary mb-1"><i class="bi bi-cpu-fill me-1"></i> 端侧 AI 极速注册</label>
+                    <small class="text-muted d-block mb-3">上传学生证或教师工牌，本地 MiniCPM-V 自动识别填充姓名</small>
+                    <button type="button" class="btn btn-outline-primary btn-sm px-4" id="ocr-upload-btn">
+                        <i class="bi bi-camera me-1"></i> 上传证件自动填表
+                    </button>
+                    <input type="file" id="ocr-file-input" accept="image/*" style="display: none;">
+                    <div id="ocr-loading-spinner" class="mt-2 text-primary" style="display: none;">
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        本地 MiniCPM-V 正在隐私解析中...
+                    </div>
+                    <div id="ocr-success-msg" class="mt-2 small text-success" style="display: none;"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="name" class="form-label">真实姓名</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                        {{ form.name(class="form-control", id="name", placeholder="请输入真实姓名") }}
+                    </div>
+                    <div class="invalid-feedback" id="nameError"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="sno" class="form-label">学号/工号</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-card-text"></i></span>
+                        {{ form.sno(class="form-control", id="sno", placeholder="请输入学号/工号") }}
+                    </div>
+                    <div class="invalid-feedback" id="snoError"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="role" class="form-label">选择身份</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-people"></i></span>
+                        {{ form.role(class="form-select", id="role") }}
+                    </div>
+                    <div class="invalid-feedback" id="roleError"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="email" class="form-label">邮箱</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                        {{ form.email(class="form-control", id="email", placeholder="请输入邮箱地址") }}
+                    </div>
+                    <div class="invalid-feedback" id="emailError"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="phone" class="form-label">手机号</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-phone"></i></span>
+                        {{ form.phone(class="form-control", id="phone", placeholder="请输入11位手机号") }}
+                    </div>
+                    <div class="invalid-feedback" id="phoneError"></div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="password" class="form-label">密码</label>
+                    <div class="password-input-group">
+                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                        {{ form.password(class="form-control", id="password", placeholder="请输入密码") }}
+                        <button type="button" class="password-toggle">
+                            <i class="bi bi-eye-slash"></i>
+                        </button>
+                    </div>
+                    <div class="invalid-feedback" id="passwordError"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="password2" class="form-label">确认密码</label>
+                    <div class="password-input-group">
+                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                        {{ form.password2(class="form-control", id="password2", placeholder="请再次输入密码") }}
+                        <button type="button" class="password-toggle">
+                            <i class="bi bi-eye-slash"></i>
+                        </button>
+                    </div>
+                    <div class="invalid-feedback" id="confirmPasswordError"></div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-register w-100">注 册</button>
+                
+                <div class="register-footer">
+                    <span>已有账号? </span><a href="{{ url_for('login') }}">立即登录</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ocrUploadBtn = document.getElementById('ocr-upload-btn');
+    const ocrFileInput = document.getElementById('ocr-file-input');
+    const ocrSpinner = document.getElementById('ocr-loading-spinner');
+    const ocrSuccessMsg = document.getElementById('ocr-success-msg');
+    const nameInput = document.getElementById('name');
+    const snoInput = document.getElementById('sno');
+    const roleInput = document.getElementById('role');
+
+    ocrUploadBtn.addEventListener('click', function() {
+        ocrFileInput.click();
+    });
+
+    ocrFileInput.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        ocrUploadBtn.style.display = 'none';
+        ocrSpinner.style.display = 'block';
+        ocrSuccessMsg.style.display = 'none';
+
+        const reader = new FileReader();
+        reader.onload = async function(event) {
+            const base64String = event.target.result.split(',')[1];
+            try {
+                const response = await fetch('/api/edge/ocr', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image_base64: base64String,
+                        data_type: 'register'
+                    })
+                });
+
+                const data = await response.json();
+                ocrSpinner.style.display = 'none';
+                ocrUploadBtn.style.display = 'inline-block';
+
+                if (response.ok && data.data) {
+                    const extracted = data.data;
+                    if (extracted.sname) {
+                        nameInput.value = extracted.sname;
+                        if (extracted.sno && snoInput) {
+                            snoInput.value = extracted.sno;
+                        }
+                        if (extracted.role && roleInput) {
+                            roleInput.value = extracted.role;
+                        }
+                        
+                        let roleZh = '学生';
+                        if (extracted.role === 'teacher') roleZh = '教师';
+                        if (extracted.role === 'admin') roleZh = '管理员';
+                        
+                        ocrSuccessMsg.innerText = `✨ 自动填表成功！识别姓名: ${extracted.sname}` + 
+                                                  (extracted.sno ? `, 学号/工号: ${extracted.sno}` : '') +
+                                                  (extracted.role ? `, 身份: ${roleZh}` : '');
+                        ocrSuccessMsg.style.display = 'block';
+                    } else {
+                        ocrSuccessMsg.innerText = `⚠️ 识别成功，但未提取到有效姓名数据。`;
+                        ocrSuccessMsg.style.display = 'block';
+                    }
+                } else {
+                    ocrSuccessMsg.innerText = `❌ 解析失败: ${data.message || '未知错误'}`;
+                    ocrSuccessMsg.style.display = 'block';
+                }
+            } catch (error) {
+                console.error(error);
+                ocrSpinner.style.display = 'none';
+                ocrUploadBtn.style.display = 'inline-block';
+                ocrSuccessMsg.innerText = `❌ 网络或大模型服务接口异常！`;
+                ocrSuccessMsg.style.display = 'block';
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+});
+</script>
+{% endblock %}
