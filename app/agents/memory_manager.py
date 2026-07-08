@@ -10,9 +10,31 @@ class EduMemoryManager:
     Handles storage and retrieval of persistent user profiles and preferences.
     """
     def __init__(self):
-        # 初始化 Mem0 实例，默认会使用本地 SQLite 或 Chroma 存储向量记忆
+        # 自动配置 Mem0：使用本地 HuggingFace 模型做向量化，DeepSeek 作为 LLM 萃取记忆
+        config = {
+            "llm": {
+                "provider": "openai",
+                "config": {
+                    "model": "deepseek-chat",
+                    "api_key": os.getenv("DEEPSEEK_API_KEY"),
+                    "base_url": "https://api.deepseek.com/v1"
+                }
+            },
+            "embedder": {
+                "provider": "huggingface",
+                "config": {
+                    # 使用一个轻量级本地模型即可满足记忆要求
+                    "model": "sentence-transformers/all-MiniLM-L6-v2"
+                }
+            }
+        }
+        
         if Memory is not None:
-            self.m = Memory()
+            try:
+                self.m = Memory.from_config(config_dict=config)
+            except Exception as e:
+                print(f"[MemoryManager] Mem0 初始化失败: {e}")
+                self.m = None
         else:
             self.m = None
 
