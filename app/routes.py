@@ -1,5 +1,5 @@
 from operator import or_
-from flask import render_template, flash, redirect, url_for, request, jsonify, send_file, current_app, g
+from flask import render_template, flash, redirect, url_for, request, jsonify, send_file, current_app, g, Response, stream_with_context
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import jwt
 from datetime import datetime, timedelta
@@ -1113,7 +1113,51 @@ def api_agent_admin():
     return jsonify({'success': True, 'reply': reply, 'thinking_steps': thinking_steps, 'echarts_option': echarts_option})
 
 # -----------------
-# 端侧隐私计算 (Edge AI) 接口
+# SSE 流式输出接口 (Server-Sent Events)
+# -----------------
+@app.route('/api/agent/stream', methods=['POST'])
+@jwt_required
+def api_agent_stream():
+    """
+    SSE 流式端点：实时推送 Coordinator 的每一步思考过程。
+    前端监听此接口可实现“AI 思考中”的实时动画效果。
+    """
+    import queue
+    import threading
+    from app.agents.coordinator import run_coordinator
+
+    data = request.get_json()
+    message = data.get('message', '')
+    if not message:
+        return jsonify({'success': False, 'message': '消息为空'}), 400
+
+    current_role = getattr(current_user, 'role', 'student')
+    current_sno = getattr(current_user, 'sno', None)
+
+    q = queue.Queue()
+
+    def on_step(msg):
+        q.put({'type': 'step', 'content': msg})
+
+    def run_agent():
+        try:
+            result = run_coordinator(message, current_role=current_role, current_sno=current_sno, step_callback=on_step)
+            q.put({'type': 'done', 'answer': result.get('answer', ''), 'echarts_option': result.get('echarts_option')})
+        except Exception as e:
+            q.put({'type': 'error', 'content': str(e)})
+
+    threading.Thread(target=run_agent, daemon=True).start()
+
+    def generate():
+        while True:
+            item = q.get()
+            yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+            if item['type'] in ('done', 'error'):
+                break
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
 # -----------------
 @app.route('/api/edge/ocr', methods=['POST'])
 def api_edge_ocr():
