@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(() => {
                 const dom = document.getElementById(chartId);
                 if (dom) {
-                    const chart = window.echarts.init(dom, 'dark');
+                    const chart = window.echarts.init(dom);
                     chart.setOption(echartsOption);
                     window.addEventListener('resize', () => chart.resize());
                 }
